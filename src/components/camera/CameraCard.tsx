@@ -59,44 +59,40 @@ export default function CameraCard({ camera, onRefreshCapture, onViewDetail }: C
   return (
     <div className="group rounded-[24px] border border-sky-100/80 bg-white p-5 shadow-sm shadow-sky-100/10 hover:shadow-lg transition duration-200 flex flex-col justify-between">
       <div>
-        {/* Preview image slot (Viewfinder placeholder for privacy) */}
+        {/* Preview image slot */}
         <div className="relative aspect-video w-full rounded-[18px] bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 overflow-hidden flex items-center justify-center border border-slate-100">
-          <div className="relative h-full w-full flex items-center justify-center">
-            {/* Corner Viewfinder Brackets */}
-            <div className="absolute top-3 right-3 w-3 h-3 border-t border-r border-slate-500/60 rounded-tr-sm"></div>
-            <div className="absolute top-3 left-3 w-3 h-3 border-t border-l border-slate-500/60 rounded-tl-sm"></div>
-            <div className="absolute bottom-3 right-3 w-3 h-3 border-b border-r border-slate-500/60 rounded-br-sm"></div>
-            <div className="absolute bottom-3 left-3 w-3 h-3 border-b border-l border-slate-500/60 rounded-tl-sm"></div>
+          {camera.previewImage ? (
+            <img 
+              src={camera.previewImage} 
+              alt={camera.cameraName} 
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            <div className="relative h-full w-full flex items-center justify-center">
+              {/* Corner Viewfinder Brackets */}
+              <div className="absolute top-3 right-3 w-3 h-3 border-t border-r border-slate-500/60 rounded-tr-sm"></div>
+              <div className="absolute top-3 left-3 w-3 h-3 border-t border-l border-slate-500/60 rounded-tl-sm"></div>
+              <div className="absolute bottom-3 right-3 w-3 h-3 border-b border-r border-slate-500/60 rounded-br-sm"></div>
+              <div className="absolute bottom-3 left-3 w-3 h-3 border-b border-l border-slate-500/60 rounded-tl-sm"></div>
 
-            {/* Camera Grid Lines */}
-            <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-[0.03] pointer-events-none">
-              <div className="border border-white"></div><div className="border border-white"></div><div className="border border-white"></div>
-              <div className="border border-white"></div><div className="border border-white"></div><div className="border border-white"></div>
-              <div className="border border-white"></div><div className="border border-white"></div><div className="border border-white"></div>
-            </div>
+              {/* Camera Grid Lines */}
+              <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-[0.03] pointer-events-none">
+                <div className="border border-white"></div><div className="border border-white"></div><div className="border border-white"></div>
+                <div className="border border-white"></div><div className="border border-white"></div><div className="border border-white"></div>
+                <div className="border border-white"></div><div className="border border-white"></div><div className="border border-white"></div>
+              </div>
 
-            <div className="text-center p-6 text-slate-500 flex flex-col items-center z-10">
-              <Camera className="h-9 w-9 text-slate-400/80 mb-2 stroke-[1.5] group-hover:scale-110 transition duration-300" />
-              <p className="text-xs font-bold text-slate-300 font-mono tracking-wider">{camera.cameraName}</p>
-              <p className="text-[10px] text-slate-500 mt-1 font-semibold">{camera.locationLabel}</p>
-            </div>
-          </div>
-
-          {/* Status badge overlays */}
-          <div className="absolute left-3.5 top-3.5 flex flex-wrap gap-2">
-            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold text-white shadow-md ${camera.status === "online" ? "bg-emerald-500" : "bg-slate-400"
-              }`}>
-              <span className={`h-1.5 w-1.5 rounded-full bg-white ${camera.status === "online" ? "animate-ping" : ""}`} />
-              {camera.status === "online" ? "LIVE" : "OFFLINE"}
-            </span>
-          </div>
-
-          {/* Confidence Score Overlay */}
-          {camera.lastAiConfidence !== undefined && (
-            <div className="absolute right-3.5 bottom-3.5 bg-slate-950/75 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-white/10 text-[10px] font-extrabold text-white">
-              AI: {camera.lastAiConfidence}%
+              <div className="text-center p-6 text-slate-500 flex flex-col items-center z-10">
+                <Camera className="h-9 w-9 text-slate-400/80 mb-2 stroke-[1.5] group-hover:scale-110 transition duration-300" />
+                <p className="text-xs font-bold text-slate-300 font-mono tracking-wider">{camera.cameraName}</p>
+                <p className="text-[10px] text-slate-500 mt-1 font-semibold">{camera.locationLabel}</p>
+              </div>
             </div>
           )}
+
+
+
+
         </div>
       </div>
 

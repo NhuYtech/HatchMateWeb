@@ -3,13 +3,17 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ref, onValue } from "firebase/database";
-import { rtdb } from "@/src/lib/firebase";
+import { doc, onSnapshot, collection, query, orderBy, limit } from "firebase/firestore";
+import { rtdb, db } from "@/src/lib/firebase";
 import { CameraItem } from "@/src/types/camera";
 import {
   X,
   WifiOff,
-  Image,
-  ImageOff
+  Image as ImageIcon,
+  ImageOff,
+  ShieldCheck,
+  AlertTriangle,
+  Clock
 } from "lucide-react";
 
 interface CameraDetailModalProps {
@@ -23,6 +27,7 @@ interface EventItem {
   id: string;
   title: string;
   time: string;
+  imageUrl: string | null;
 }
 
 export default function CameraDetailModal({
@@ -33,23 +38,19 @@ export default function CameraDetailModal({
 }: CameraDetailModalProps) {
   const [camera, setCamera] = useState<CameraItem>(initialCamera);
   const [loading, setLoading] = useState(true);
-
-  // Events list matching UI
-  const [events, setEvents] = useState<EventItem[]>([
-    { id: "evt-1", title: "Ảnh vừa chụp", time: "13:31:49" },
-    { id: "evt-2", title: "Ảnh vừa chụp", time: "12:15:30" },
-    { id: "evt-3", title: "Ảnh vừa chụp", time: "08:00:15" },
-  ]);
-
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Sync with Firebase Database
+  // Sync with Firebase RTDB & Firestore
   useEffect(() => {
     if (!isOpen) return;
 
     setLoading(true);
+
+    // 1. Sync telemetry and status from Firebase Realtime Database
     const deviceRef = ref(rtdb, `incubators/${deviceId}`);
-    const unsubscribe = onValue(deviceRef, (snapshot) => {
+    const unsubscribeRtdb = onValue(deviceRef, (snapshot) => {
       if (snapshot.exists()) {
         const item = snapshot.val();
         const cameraStatus = (item.camera?.status ?? item.status ?? "offline").toLowerCase() === "online" ? "online" : "offline";
@@ -61,30 +62,70 @@ export default function CameraDetailModal({
         const previousEggCount = status === "warning" ? 24 : eggCount;
         const hasVariation = eggCount !== previousEggCount;
 
-        setCamera({
-          id: `cam-${deviceId}`,
-          deviceId,
+        setCamera(prev => ({
+          ...prev,
+          status: cameraStatus,
           deviceName,
           cameraName: `Cam ${deviceName}`,
-          locationLabel: "Trạm ấp",
-          status: cameraStatus,
-          previewImage: null,
-          lastCaptureAt: lastSeen,
-          aiStatus: hasVariation ? "alert" : "analyzed",
-          aiAlertCount: hasVariation ? 1 : 0,
-          lastAiSummary: hasVariation 
-            ? `Cảnh báo: Số lượng trứng thay đổi (Ban đầu: ${previousEggCount}, Hiện tại: ${eggCount})` 
-            : `Số lượng trứng ổn định: ${eggCount} quả`,
-          lastAiConfidence: 98,
-          streamEnabled: false,
           eggCount,
           previousEggCount,
-        });
+          aiStatus: hasVariation ? "alert" : "analyzed",
+          aiAlertCount: hasVariation ? 1 : 0,
+        }));
       }
+    });
+
+    // 2. Listen to latest AI image snapshots from Firestore doc: camera/current
+    const cameraDocRef = doc(db, "camera", "current");
+    const unsubscribeFirestoreDoc = onSnapshot(cameraDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const aiUrl = data.aiImageUrl || data.latestImageUrl || null;
+        setCamera(prev => ({
+          ...prev,
+          previewImage: aiUrl,
+          lastAiSummary: data.detectedLabel 
+            ? `AI nhận diện thành công: ${data.detectedLabel} quả trứng`
+            : prev.lastAiSummary,
+          lastAiConfidence: data.confidence ? Math.round(data.confidence * 100) : prev.lastAiConfidence,
+          lastCaptureAt: data.updatedAt 
+            ? new Date(data.updatedAt.seconds * 1000).toLocaleTimeString("vi-VN")
+            : prev.lastCaptureAt
+        }));
+        // Default to showing latest scanned image
+        setSelectedImageUrl(prevUrl => prevUrl || aiUrl);
+      }
+    });
+
+    // 3. Listen to recent historical frames list from Firestore: incubators/{deviceId}/camera_frames
+    const framesRef = collection(db, "incubators", deviceId, "camera_frames");
+    const q = query(framesRef, orderBy("updatedAt", "desc"), limit(5));
+    const unsubscribeFirestoreCol = onSnapshot(q, (snapshot) => {
+      const parsedEvents: EventItem[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const date = data.updatedAt
+          ? new Date(data.updatedAt.seconds * 1000)
+          : new Date();
+        parsedEvents.push({
+          id: docSnap.id,
+          title: `Quét AI: ${data.detectedLabel ?? "0"} quả trứng`,
+          time: date.toLocaleTimeString("vi-VN") + " " + date.toLocaleDateString("vi-VN"),
+          imageUrl: data.aiImageUrl || data.latestImageUrl || null
+        });
+      });
+      setEvents(parsedEvents);
+      setLoading(false);
+    }, (err) => {
+      console.warn("Firestore collection listen failed (maybe collection empty or missing permissions):", err);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeRtdb();
+      unsubscribeFirestoreDoc();
+      unsubscribeFirestoreCol();
+    };
   }, [isOpen, deviceId, initialCamera]);
 
   if (!isOpen) return null;
@@ -94,12 +135,6 @@ export default function CameraDetailModal({
     setTimeout(() => {
       setNotification(null);
     }, 3000);
-  };
-
-  // Remove event from list
-  const handleRemoveEvent = (id: string) => {
-    setEvents(prev => prev.filter(evt => evt.id !== id));
-    showToast("Đã xóa sự kiện khỏi danh sách");
   };
 
   return createPortal(
@@ -133,54 +168,133 @@ export default function CameraDetailModal({
           </button>
         </div>
 
-        {/* 1. Camera Status Panel (Admin only, NO live image stream) */}
-        <div className="relative aspect-video w-full rounded-[28px] bg-slate-900 flex flex-col items-center justify-center gap-2 text-white/70 shadow-inner border border-slate-950/20 select-none">
-          {camera.status === "online" ? (
+        {/* 1. Camera Viewfinder Panel (Displays static AI scan or connection status) */}
+        <div className="relative aspect-video w-full rounded-[28px] bg-slate-900 overflow-hidden flex flex-col items-center justify-center gap-2 text-white/70 shadow-inner border border-slate-950/20 select-none">
+          {selectedImageUrl ? (
             <>
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <p className="text-sm font-bold">Camera đang hoạt động</p>
+              <img 
+                src={selectedImageUrl} 
+                alt="AI Camera Frame" 
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              {/* Overlay watermarks */}
+              <div className="absolute top-3 left-3 bg-black/45 backdrop-blur-md rounded-lg px-2 py-1 text-[9px] font-bold text-white uppercase tracking-wider font-mono">
+                CAM_STREAM_AI
+              </div>
             </>
-          ) : (
-            <>
-              <WifiOff className="h-6 w-6 text-white/40" />
-              <p className="text-sm font-bold">Camera ngắt kết nối</p>
-            </>
+          ) : null}
+
+          {/* Connection status overlay */}
+          <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-1.5 backdrop-blur-sm border border-white/10">
+            {camera.status === "online" ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-white">Camera Online</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-3.5 w-3.5 text-rose-500" />
+                <span className="text-[10px] font-bold text-white">Camera Offline</span>
+              </>
+            )}
+          </div>
+
+          <div className="absolute bottom-3 right-3 rounded-xl bg-slate-900/80 px-3 py-1.5 backdrop-blur-sm border border-white/10 text-[10px] font-bold text-white/70">
+            Thời gian: {camera.lastCaptureAt}
+          </div>
+          
+          {!selectedImageUrl && (
+            <div className="text-center p-6 text-slate-500 flex flex-col items-center z-10">
+              <ImageOff className="h-8 w-8 text-white/40 mb-2" />
+              <p className="text-xs font-bold text-white/60">Chưa có ảnh quét AI nào từ máy</p>
+            </div>
           )}
-          <p className="text-[10px] text-white/40">Cập nhật: {camera.lastCaptureAt}</p>
         </div>
 
-        {/* 3. Event logs "SỰ KIỆN" list */}
+        {/* 2. AI Details Panel */}
+        <div className="bg-white border border-[#FBEBE3] rounded-[28px] p-5 shadow-sm flex flex-col gap-3.5">
+          <div className="flex items-center justify-between">
+            <h4 className="text-[11px] font-black uppercase tracking-wider text-[#1E293B] flex items-center gap-1.5">
+              <ShieldCheck className="h-4.5 w-4.5 text-sky-600" />
+              NHẬN DIỆN EGG COUNT (HATCHMATE AI)
+            </h4>
+            {camera.aiStatus === "alert" ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold text-rose-600 border border-rose-100 animate-pulse">
+                <AlertTriangle className="h-3 w-3" />
+                Cảnh báo
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-600 border border-emerald-100">
+                Ổn định
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-5 bg-[#FFF8F6] border border-[#F5E1D6]/40 rounded-[20px] p-4.5">
+            {/* Large counter */}
+            <div className="flex flex-col items-center justify-center bg-white rounded-2xl p-3 border border-[#F5E1D6] shadow-sm min-w-[76px]">
+              <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">ĐẾM ĐƯỢC</span>
+              <span className={`text-2xl font-black font-mono mt-0.5 ${camera.aiStatus === "alert" ? "text-rose-600" : "text-sky-950"}`}>
+                {camera.eggCount}
+              </span>
+            </div>
+
+            {/* Stats progress bar & description */}
+            <div className="flex-1 space-y-2">
+              <div>
+                <p className="text-xs font-black text-sky-950">{camera.lastAiSummary}</p>
+                <p className="text-[10px] font-semibold text-slate-400 mt-0.5">Mô hình AI: YOLOv8l (Chạy tại local)</p>
+              </div>
+              
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px] font-bold">
+                  <span className="text-slate-400">ĐỘ TIN CẬY (CONFIDENCE):</span>
+                  <span className="text-sky-950 font-mono">{camera.lastAiConfidence}%</span>
+                </div>
+                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${camera.aiStatus === "alert" ? "bg-rose-500" : "bg-sky-600"}`} 
+                    style={{ width: `${camera.lastAiConfidence}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Event logs "SỰ KIỆN LỊCH SỬ" list */}
         <div className="bg-[#FFF8F6] border border-[#F5E1D6] rounded-[28px] p-5 flex flex-col gap-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-black uppercase tracking-wider text-[#1E293B]">
-              SỰ KIỆN
+            <h4 className="text-[11px] font-black uppercase tracking-wider text-[#1E293B] flex items-center gap-1.5">
+              <Clock className="h-4 w-4 text-slate-600" />
+              LỊCH SỬ ẢNH QUÉT AI GẦN ĐÂY
             </h4>
-            <a
-              href="#ai-analysis"
-              onClick={(e) => {
-                e.preventDefault();
-                onClose();
-                const el = document.getElementById("ai-analysis");
-                if (el) el.scrollIntoView({ behavior: "smooth" });
-              }}
-              className="text-[11px] font-bold text-amber-600 hover:text-amber-700 transition"
-            >
-              Thêm &gt;
-            </a>
           </div>
 
           <div className="flex flex-col gap-3">
             {events.length === 0 ? (
-              <p className="text-[11px] font-bold text-slate-400 text-center py-4">Chưa có sự kiện chụp ảnh nào.</p>
+              <p className="text-[11px] font-bold text-slate-400 text-center py-4">Chưa có lịch sử quét ảnh nào.</p>
             ) : (
               events.map((evt) => (
                 <div
                   key={evt.id}
-                  className="flex items-center justify-between p-3.5 bg-white border border-[#F5E1D6]/30 rounded-2xl shadow-sm hover:shadow transition duration-150"
+                  onClick={() => {
+                    if (evt.imageUrl) {
+                      setSelectedImageUrl(evt.imageUrl);
+                      showToast("Đang xem ảnh chụp lịch sử");
+                    }
+                  }}
+                  className={`flex items-center justify-between p-3.5 bg-white border rounded-2xl shadow-sm hover:shadow transition duration-150 cursor-pointer ${
+                    selectedImageUrl === evt.imageUrl ? "border-amber-400 bg-amber-50/10" : "border-[#F5E1D6]/30"
+                  }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500">
-                      <Image className="h-5 w-5" />
+                    <div className="h-10 w-10 rounded-xl overflow-hidden bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 flex-shrink-0">
+                      {evt.imageUrl ? (
+                        <img src={evt.imageUrl} alt="History AI Preview" className="h-full w-full object-cover" />
+                      ) : (
+                        <ImageIcon className="h-5 w-5" />
+                      )}
                     </div>
                     <div>
                       <p className="text-xs font-bold text-sky-950">{evt.title}</p>
@@ -188,20 +302,14 @@ export default function CameraDetailModal({
                     </div>
                   </div>
                   
-                  {/* Action delete/hide button */}
-                  <button
-                    onClick={() => handleRemoveEvent(evt.id)}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1E293B] hover:bg-[#2D3748] text-white transition active:scale-95 duration-100 cursor-pointer shadow-sm"
-                    title="Ẩn sự kiện"
-                  >
-                    <ImageOff className="h-4.5 w-4.5 text-slate-200" />
-                  </button>
+                  <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg">
+                    Xem ảnh
+                  </span>
                 </div>
               ))
             )}
           </div>
         </div>
-
 
       </div>
     </div>,

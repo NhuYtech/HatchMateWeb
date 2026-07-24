@@ -60,14 +60,14 @@ export default function CameraPage() {
                 cameraName: `Cam ${deviceName}`,
                 locationLabel: "Trạm ấp",
                 status: status === "offline" ? "offline" : "online",
-                previewImage: null,
+                previewImage: item.camera?.previewImage ?? null,
                 lastCaptureAt: lastSeen,
                 aiStatus: hasVariation ? "alert" : "analyzed",
                 aiAlertCount: hasVariation ? 1 : 0,
                 lastAiSummary: hasVariation 
                   ? `Cảnh báo: Số lượng trứng thay đổi (Ban đầu: ${previousEggCount}, Hiện tại: ${eggCount})` 
                   : `Số lượng trứng ổn định: ${eggCount} quả`,
-                lastAiConfidence: 98,
+                lastAiConfidence: item.camera?.confidence !== undefined ? Math.round(Number(item.camera.confidence) * 100) : 98,
                 streamEnabled: false,
                 eggCount,
                 previousEggCount,
@@ -79,13 +79,13 @@ export default function CameraPage() {
                 deviceId: key,
                 deviceName: deviceName,
                 capturedAt: lastSeen,
-                imageUrl: null,
+                imageUrl: item.camera?.previewImage ?? null,
                 resultStatus: hasVariation ? "warning" : "normal",
                 resultTitle: hasVariation ? "Số lượng thay đổi" : "Số lượng ổn định",
                 resultSummary: hasVariation 
                   ? `Phát hiện số trứng thay đổi từ ${previousEggCount} xuống ${eggCount} quả` 
                   : `AI nhận diện thành công: ${eggCount} quả trứng, không có thay đổi`,
-                confidence: 98,
+                confidence: item.camera?.confidence !== undefined ? Math.round(Number(item.camera.confidence) * 100) : 98,
                 processedBy: "HatchMate AI v1.0",
                 notes: null,
               });
@@ -93,11 +93,33 @@ export default function CameraPage() {
           }
         });
 
-        const total = activeCameras.length;
-        const totalEggs = activeCameras.reduce((sum, c) => sum + (c.eggCount || 0), 0);
-        const onlineCount = activeCameras.filter((c) => c.status === "online").length;
-        const analyzed = onlineCount > 0 ? onlineCount * 5 + 18 : 0;
-        const alerts = activeCameras.filter((c) => c.eggCount !== undefined && c.previousEggCount !== undefined && c.eggCount !== c.previousEggCount).length;
+        let total = activeCameras.length;
+        let totalEggs = activeCameras.reduce((sum, c) => sum + (c.eggCount || 0), 0);
+        let onlineCount = activeCameras.filter((c) => c.status === "online").length;
+        let analyzed = onlineCount > 0 ? onlineCount * 5 + 18 : 0;
+        let alerts = activeCameras.filter((c) => c.eggCount !== undefined && c.previousEggCount !== undefined && c.eggCount !== c.previousEggCount).length;
+
+        // Dev fallback: show mock MATG01 camera when no real cameras in DB
+        if (activeCameras.length === 0) {
+          const mockCamera: CameraItem = {
+            id: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
+            cameraName: "Cam MATG01 (Chạy thử)", locationLabel: "Trạm ấp",
+            status: "online", previewImage: "/incubator_eggs.png",
+            lastCaptureAt: new Date().toLocaleTimeString("vi-VN"),
+            aiStatus: "analyzed", aiAlertCount: 0,
+            lastAiSummary: "Số lượng trứng ổn định: 9 quả",
+            lastAiConfidence: 74, streamEnabled: false, eggCount: 9, previousEggCount: 9
+          };
+          activeCameras.push(mockCamera);
+          activeAiRecords.push({
+            id: "ai-MATG01", cameraId: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
+            capturedAt: new Date().toLocaleTimeString("vi-VN"), imageUrl: "/incubator_eggs.png",
+            resultStatus: "normal", resultTitle: "Số lượng ổn định",
+            resultSummary: "AI nhận diện thành công: 9 quả trứng, không có thay đổi",
+            confidence: 74, processedBy: "HatchMate AI v1.0", notes: null
+          });
+          total = 1; totalEggs = 9; analyzed = 24; alerts = 0;
+        }
 
         setCameras(activeCameras);
         setAiRecords(activeAiRecords);
@@ -108,14 +130,25 @@ export default function CameraPage() {
           variationAlerts: alerts,
         });
       } else {
-        setCameras([]);
-        setAiRecords([]);
-        setStats({
-          totalCameras: 0,
-          totalEggs: 0,
-          analyzedImages: 0,
-          variationAlerts: 0,
-        });
+        // Fallback khi RTDB node trống
+        const mockCamera: CameraItem = {
+          id: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
+          cameraName: "Cam MATG01 (Chạy thử)", locationLabel: "Trạm ấp",
+          status: "online", previewImage: "/incubator_eggs.png",
+          lastCaptureAt: new Date().toLocaleTimeString("vi-VN"),
+          aiStatus: "analyzed", aiAlertCount: 0,
+          lastAiSummary: "Số lượng trứng ổn định: 9 quả",
+          lastAiConfidence: 74, streamEnabled: false, eggCount: 9, previousEggCount: 9
+        };
+        setCameras([mockCamera]);
+        setAiRecords([{
+          id: "ai-MATG01", cameraId: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
+          capturedAt: new Date().toLocaleTimeString("vi-VN"), imageUrl: "/incubator_eggs.png",
+          resultStatus: "normal", resultTitle: "Số lượng ổn định",
+          resultSummary: "AI nhận diện thành công: 9 quả trứng, không có thay đổi",
+          confidence: 74, processedBy: "HatchMate AI v1.0", notes: null
+        }]);
+        setStats({ totalCameras: 1, totalEggs: 9, analyzedImages: 24, variationAlerts: 0 });
       }
       setLoading(false);
     }, (err) => {
