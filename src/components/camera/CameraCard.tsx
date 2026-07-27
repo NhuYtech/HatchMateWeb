@@ -59,7 +59,7 @@ export default function CameraCard({ camera, onRefreshCapture, onViewDetail }: C
   return (
     <div className="group rounded-[24px] border border-sky-100/80 bg-white p-5 shadow-sm shadow-sky-100/10 hover:shadow-lg transition duration-200 flex flex-col justify-between">
       <div>
-        {/* Preview / Live Stream image slot */}
+        {/* Preview / Static AI Capture image slot */}
         <div className="relative aspect-video w-full rounded-[18px] bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 overflow-hidden flex items-center justify-center border border-slate-100">
           {camera.previewImage ? (
             <img 
@@ -67,14 +67,14 @@ export default function CameraCard({ camera, onRefreshCapture, onViewDetail }: C
               alt={camera.cameraName} 
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
-          ) : camera.streamUrl || (camera.ipAddress && camera.ipAddress.length > 5) ? (
+          ) : (camera.ipAddress || camera.streamUrl) ? (
             <img 
-              src={camera.streamUrl || (camera.ipAddress?.startsWith('http') ? camera.ipAddress : `http://${camera.ipAddress}/stream`)} 
+              src={camera.ipAddress ? (camera.ipAddress.startsWith('http') ? `${camera.ipAddress.replace(/\/stream$/, '')}/capture` : `http://${camera.ipAddress.replace(/\/stream$/, '')}/capture`) : '/incubator_eggs.png'} 
               alt={camera.cameraName} 
               className="absolute inset-0 h-full w-full object-cover"
               onError={(e) => {
-                // If stream connection is locked by Mobile App, hide broken image
-                (e.target as HTMLImageElement).style.display = "none";
+                // If static capture fails, fallback smoothly to mock image placeholder
+                (e.target as HTMLImageElement).src = '/incubator_eggs.png';
               }}
             />
           ) : (
@@ -95,17 +95,8 @@ export default function CameraCard({ camera, onRefreshCapture, onViewDetail }: C
 
           {/* Dark capsule badge overlay */}
           <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-1 text-[10px] font-extrabold text-white border border-white/10 shadow-sm">
-            {camera.previewImage ? (
-              <>
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                <span>AI SNAPSHOT</span>
-              </>
-            ) : (
-              <>
-                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                <span>LIVE</span>
-              </>
-            )}
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            <span>AI SNAPSHOT</span>
           </div>
         </div>
       </div>
