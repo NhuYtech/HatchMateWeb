@@ -7,8 +7,7 @@ import {
   MoreVertical, 
   Brain, 
   Download,
-  X,
-  ExternalLink
+  X
 } from "lucide-react";
 import { AiRecord } from "@/src/types/camera";
 import DataTablePagination from "@/src/components/common/DataTablePagination";
@@ -128,13 +127,14 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* Nút Xuất báo cáo AI màu xanh dương */}
           <button
             type="button"
             onClick={handleExportCsv}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-[16px] border border-sky-100 bg-sky-50/40 px-4 text-xs font-bold text-sky-700 shadow-sm transition hover:bg-sky-100 active:scale-95 duration-150 cursor-pointer"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-[16px] bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs px-4 shadow-sm shadow-sky-200 transition active:scale-95 duration-150 cursor-pointer"
             title="Xuất danh sách phân tích AI ra file CSV Excel"
           >
-            <Download className="h-4 w-4 text-sky-600" />
+            <Download className="h-4 w-4 text-white" />
             <span>Xuất báo cáo AI</span>
           </button>
         </div>
@@ -150,7 +150,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
               <th className="px-6 py-4">Thiết bị / Camera</th>
               <th className="px-6 py-4">Kết quả AI</th>
               <th className="px-6 py-4">Confidence</th>
-              <th className="px-6 py-4">Chi tiết chuẩn đoán</th>
+              <th className="px-6 py-4 text-center uppercase tracking-wider">CHI TIẾT CHẨN ĐOÁN</th>
               <th className="px-6 py-4">Ghi chú</th>
               <th className="px-6 py-4 text-center">Hành động</th>
             </tr>
@@ -210,10 +210,12 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                   </span>
                 </td>
 
-                {/* Chi tiết chuẩn đoán */}
-                <td className="px-6 py-4">
-                  <div className="max-w-[280px]">
-                    <p className="font-bold text-sky-950 text-xs mb-0.5">{record.resultTitle}</p>
+                {/* Chi tiết chuẩn đoán - In hoa & Căn giữa */}
+                <td className="px-6 py-4 text-center">
+                  <div className="mx-auto max-w-[280px] text-center">
+                    <p className="font-extrabold text-sky-950 text-xs mb-0.5 uppercase tracking-wide">
+                      {record.resultTitle}
+                    </p>
                     <p className="text-[11px] font-semibold text-slate-500 line-clamp-2 leading-relaxed">
                       {record.resultSummary}
                     </p>
@@ -293,20 +295,22 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
       {previewRecord && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative max-w-xl w-full rounded-[28px] bg-white p-6 shadow-2xl border border-sky-100 flex flex-col gap-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h4 className="text-base font-extrabold text-sky-950">Chi tiết Phân tích AI (YOLOv8)</h4>
-                <p className="text-xs text-slate-500 font-semibold">Thiết bị: {previewRecord.deviceName} · Thời gian: {formatReadableDateTime(previewRecord.capturedAt)}</p>
-              </div>
+            <div className="relative border-b border-slate-100 pb-3 text-center">
+              <h4 className="text-base font-extrabold text-sky-950 uppercase tracking-wide">
+                CHI TIẾT PHÂN TÍCH AI (YOLOV8)
+              </h4>
+              <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                Thiết bị: {previewRecord.deviceName} · Thời gian: {formatReadableDateTime(previewRecord.capturedAt)}
+              </p>
               <button
                 onClick={() => setPreviewRecord(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition cursor-pointer"
+                className="absolute right-0 top-0 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition cursor-pointer"
               >
-                <X className="h-4.5 w-4.5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-200 flex items-center justify-center">
+            <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 flex items-center justify-center">
               {previewRecord.imageUrl ? (
                 <img 
                   src={previewRecord.imageUrl} 
@@ -323,7 +327,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                 <span className="text-xs font-bold text-slate-500">KẾT QUẢ CHẨN ĐOÁN:</span>
                 {getStatusText(previewRecord.resultStatus)}
               </div>
-              <p className="text-sm font-bold text-sky-950">{previewRecord.resultTitle}</p>
+              <p className="text-sm font-bold text-sky-950 uppercase tracking-wide">{previewRecord.resultTitle}</p>
               <p className="text-xs font-semibold text-slate-600 leading-relaxed">{previewRecord.resultSummary}</p>
               <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-slate-500">
                 <span>Độ tin cậy: <strong className="text-sky-700">{previewRecord.confidence}%</strong></span>
@@ -341,7 +345,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-white">
                 <ImageIcon className="h-5 w-5 text-sky-400" />
-                <h4 className="text-base font-extrabold">Xem ảnh gốc phóng to</h4>
+                <h4 className="text-base font-extrabold uppercase tracking-wide">XEM ẢNH GỐC PHÓNG TO</h4>
               </div>
               <button
                 onClick={() => setPreviewOriginalUrl(null)}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Image as ImageIcon, Camera, Clock, Smartphone, Sparkles, ExternalLink, X } from "lucide-react";
+import { Image as ImageIcon, X } from "lucide-react";
 import { PhotoRecord } from "@/src/types/camera";
 import DataTablePagination from "@/src/components/common/DataTablePagination";
 
@@ -49,36 +49,16 @@ export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTablePro
 
   const paginatedPhotos = photos.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const getTypeBadge = (type: PhotoRecord["type"]) => {
+  const getTypeText = (type: PhotoRecord["type"]) => {
     switch (type) {
       case "manual":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-bold text-sky-700 border border-sky-100">
-            <Smartphone className="h-3.5 w-3.5" />
-            Thủ công (App)
-          </span>
-        );
+        return <span className="font-semibold text-slate-800 text-xs">Thủ công (App)</span>;
       case "auto":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700 border border-amber-100">
-            <Clock className="h-3.5 w-3.5" />
-            Định kỳ (3h)
-          </span>
-        );
+        return <span className="font-semibold text-amber-700 text-xs">Định kỳ (3h)</span>;
       case "ai":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700 border border-purple-100">
-            <Sparkles className="h-3.5 w-3.5" />
-            AI Nhận diện
-          </span>
-        );
+        return <span className="font-semibold text-purple-700 text-xs">AI Nhận diện</span>;
       default:
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-0.5 text-xs font-bold text-slate-600 border border-slate-200">
-            <Camera className="h-3.5 w-3.5" />
-            Ảnh chụp
-          </span>
-        );
+        return <span className="font-semibold text-slate-800 text-xs">Ảnh chụp</span>;
     }
   };
 
@@ -144,25 +124,24 @@ export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTablePro
                   {photo.deviceName}
                 </td>
 
-                {/* Type Badge */}
+                {/* Type Plain Text */}
                 <td className="px-5 py-3">
-                  {getTypeBadge(photo.type)}
+                  {getTypeText(photo.type)}
                 </td>
 
                 {/* Time */}
-                <td className="px-5 py-3 text-xs font-mono font-semibold text-slate-500">
+                <td className="px-5 py-3 text-xs font-semibold text-slate-500">
                   {formatReadableDateTime(photo.time)}
                 </td>
 
-                {/* Action */}
+                {/* Action Plain Text Link */}
                 <td className="px-5 py-3 text-center">
                   <button
                     type="button"
                     onClick={() => setPreviewPhoto(photo)}
-                    className="inline-flex h-8 items-center gap-1 px-3 rounded-lg border border-sky-100 bg-sky-50 text-xs font-bold text-sky-700 hover:bg-sky-100 transition duration-150 cursor-pointer"
+                    className="font-bold text-sky-600 hover:text-sky-800 text-xs cursor-pointer hover:underline"
                   >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    <span>Xem phóng to</span>
+                    Xem phóng to
                   </button>
                 </td>
               </tr>
