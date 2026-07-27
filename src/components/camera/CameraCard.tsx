@@ -59,9 +59,21 @@ export default function CameraCard({ camera, onRefreshCapture, onViewDetail }: C
   return (
     <div className="group rounded-[24px] border border-sky-100/80 bg-white p-5 shadow-sm shadow-sky-100/10 hover:shadow-lg transition duration-200 flex flex-col justify-between">
       <div>
-        {/* Preview image slot */}
+        {/* Preview / Live Stream image slot */}
         <div className="relative aspect-video w-full rounded-[18px] bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 overflow-hidden flex items-center justify-center border border-slate-100">
-          {camera.previewImage ? (
+          {camera.streamUrl || (camera.ipAddress && camera.ipAddress.length > 5) ? (
+            <img 
+              src={camera.streamUrl || (camera.ipAddress?.startsWith('http') ? camera.ipAddress : `http://${camera.ipAddress}/stream`)} 
+              alt={camera.cameraName} 
+              className="absolute inset-0 h-full w-full object-cover"
+              onError={(e) => {
+                // Fallback to static preview image if stream fails
+                if (camera.previewImage) {
+                  (e.target as HTMLImageElement).src = camera.previewImage;
+                }
+              }}
+            />
+          ) : camera.previewImage ? (
             <img 
               src={camera.previewImage} 
               alt={camera.cameraName} 
@@ -75,13 +87,6 @@ export default function CameraCard({ camera, onRefreshCapture, onViewDetail }: C
               <div className="absolute bottom-3 right-3 w-3 h-3 border-b border-r border-slate-500/60 rounded-br-sm"></div>
               <div className="absolute bottom-3 left-3 w-3 h-3 border-b border-l border-slate-500/60 rounded-tl-sm"></div>
 
-              {/* Camera Grid Lines */}
-              <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-[0.03] pointer-events-none">
-                <div className="border border-white"></div><div className="border border-white"></div><div className="border border-white"></div>
-                <div className="border border-white"></div><div className="border border-white"></div><div className="border border-white"></div>
-                <div className="border border-white"></div><div className="border border-white"></div><div className="border border-white"></div>
-              </div>
-
               <div className="text-center p-6 text-slate-500 flex flex-col items-center z-10">
                 <Camera className="h-9 w-9 text-slate-400/80 mb-2 stroke-[1.5] group-hover:scale-110 transition duration-300" />
                 <p className="text-xs font-bold text-slate-300 font-mono tracking-wider">{camera.cameraName}</p>
@@ -90,9 +95,11 @@ export default function CameraCard({ camera, onRefreshCapture, onViewDetail }: C
             </div>
           )}
 
-
-
-
+          {/* Dark capsule LIVE badge overlay matching Mobile App */}
+          <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-1 text-[10px] font-extrabold text-white border border-white/10 shadow-sm">
+            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+            <span>LIVE</span>
+          </div>
         </div>
       </div>
 

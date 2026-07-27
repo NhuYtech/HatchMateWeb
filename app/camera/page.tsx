@@ -97,6 +97,32 @@ export default function CameraPage() {
                 processedBy: "HatchMate YOLOv8 AI",
                 notes: null,
               });
+              // Parse AI events list saved from Mobile App or Web for realtime sync
+              if (item.ai_events && typeof item.ai_events === "object") {
+                Object.keys(item.ai_events).forEach((evKey) => {
+                  const ev = item.ai_events[evKey];
+                  if (ev && typeof ev === "object") {
+                    const evEggCount = ev.eggCount !== undefined ? Number(ev.eggCount) : eggCount;
+                    const evIsLost = evEggCount < initialEggCount && initialEggCount > 0;
+                    activeAiRecords.unshift({
+                      id: `ai-event-${evKey}`,
+                      cameraId: `cam-${key}`,
+                      deviceId: key,
+                      deviceName: deviceName,
+                      capturedAt: ev.time || ev.timestamp || lastSeen,
+                      imageUrl: ev.imageUrl || ev.image || item.camera?.previewImage || null,
+                      resultStatus: evIsLost ? "danger" : "normal",
+                      resultTitle: ev.title || (evIsLost ? "CẢNH BÁO MẤT TRỨNG" : "Số lượng ổn định"),
+                      resultSummary: evIsLost 
+                        ? `Phát hiện sụt giảm trứng: Ban đầu ${initialEggCount} quả, hiện còn ${evEggCount} quả (Mất ${initialEggCount - evEggCount} quả)` 
+                        : `AI nhận diện thành công: ${evEggCount} quả trứng`,
+                      confidence: ev.confidence !== undefined ? Math.round(Number(ev.confidence) * 100) : 98,
+                      processedBy: "HatchMate App Sync",
+                      notes: null,
+                    });
+                  }
+                });
+              }
             }
           }
         });
