@@ -58,6 +58,9 @@ export default function CameraPage() {
               const isEggLost = item.telemetry?.isEggLost === true || (eggCount < initialEggCount && initialEggCount > 0);
               const lostEggCount = isEggLost ? (initialEggCount - eggCount) : 0;
 
+              const cameraUrl = item.camera?.url || item.camera?.streamUrl || item.camera?.stream_url || item.camera_url || item.streamUrl || "http://192.168.88.220:81/stream";
+              const cameraIp = item.camera?.ipAddress || item.camera?.ip || item.ipAddress || "192.168.88.220:81";
+
               activeCameras.push({
                 id: `cam-${key}`,
                 deviceId: key,
@@ -73,7 +76,9 @@ export default function CameraPage() {
                   ? `🚨 CẢNH BÁO MẤT TRỨNG: Ban đầu ${initialEggCount} quả, hiện còn ${eggCount} quả (Mất ${lostEggCount} quả)` 
                   : `Số lượng trứng ổn định: ${eggCount}/${initialEggCount} quả`,
                 lastAiConfidence: item.camera?.confidence !== undefined ? Math.round(Number(item.camera.confidence) * 100) : 98,
-                streamEnabled: false,
+                streamEnabled: true,
+                streamUrl: cameraUrl,
+                ipAddress: cameraIp,
                 eggCount,
                 previousEggCount: initialEggCount,
                 initialEggCount,
@@ -139,20 +144,22 @@ export default function CameraPage() {
             id: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
             cameraName: "Cam MATG01 (Chạy thử)", locationLabel: "Trạm ấp",
             status: "online", previewImage: "/incubator_eggs.png",
+            streamUrl: "http://192.168.88.220:81/stream",
+            ipAddress: "192.168.88.220:81",
             lastCaptureAt: new Date().toLocaleTimeString("vi-VN"),
             aiStatus: "analyzed", aiAlertCount: 0,
-            lastAiSummary: "Số lượng trứng ổn định: 9 quả",
-            lastAiConfidence: 74, streamEnabled: false, eggCount: 9, previousEggCount: 9
+            lastAiSummary: "Số lượng trứng ổn định: 24/24 quả",
+            lastAiConfidence: 94, streamEnabled: true, eggCount: 24, previousEggCount: 24, initialEggCount: 24
           };
           activeCameras.push(mockCamera);
           activeAiRecords.push({
             id: "ai-MATG01", cameraId: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
             capturedAt: new Date().toLocaleTimeString("vi-VN"), imageUrl: "/incubator_eggs.png",
             resultStatus: "normal", resultTitle: "Số lượng ổn định",
-            resultSummary: "AI nhận diện thành công: 9 quả trứng, không có thay đổi",
-            confidence: 74, processedBy: "HatchMate AI v1.0", notes: null
+            resultSummary: "AI nhận diện thành công: 24 quả trứng, không có thay đổi",
+            confidence: 94, processedBy: "HatchMate AI v1.0", notes: null
           });
-          total = 1; totalEggs = 9; analyzed = 24; alerts = 0;
+          total = 1; totalEggs = 24; analyzed = 24; alerts = 0;
         }
 
         setCameras(activeCameras);
@@ -169,10 +176,12 @@ export default function CameraPage() {
           id: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
           cameraName: "Cam MATG01 (Chạy thử)", locationLabel: "Trạm ấp",
           status: "online", previewImage: "/incubator_eggs.png",
+          streamUrl: "http://192.168.88.220:81/stream",
+          ipAddress: "192.168.88.220:81",
           lastCaptureAt: new Date().toLocaleTimeString("vi-VN"),
           aiStatus: "analyzed", aiAlertCount: 0,
-          lastAiSummary: "Số lượng trứng ổn định: 9 quả",
-          lastAiConfidence: 74, streamEnabled: false, eggCount: 9, previousEggCount: 9
+          lastAiSummary: "Số lượng trứng ổn định: 24/24 quả",
+          lastAiConfidence: 94, streamEnabled: true, eggCount: 24, previousEggCount: 24, initialEggCount: 24
         };
         setCameras([mockCamera]);
         setAiRecords([{
