@@ -275,22 +275,13 @@ export default function CameraPage() {
           </p>
         </div>
       ) : (
-        <>
-          {/* Thẻ chứa thông tin máy ấp & camera */}
-          <CameraGrid 
-            cameras={cameras} 
-            onViewDetail={setSelectedCamera}
-          />
-          
-          {/* 3. Danh sách camera */}
-          <CameraTable 
-            cameras={cameras}
-            onSelectCamera={setSelectedCamera}
-            onCaptureNew={(id) => {
-              console.log("Request manual capture for camera:", id);
-            }}
-          />
-        </>
+        <CameraTable 
+          cameras={cameras}
+          onSelectCamera={setSelectedCamera}
+          onCaptureNew={(id) => {
+            console.log("Request manual capture for camera:", id);
+          }}
+        />
       )}
 
       {/* 4. Lịch sử phân tích của AI */}
