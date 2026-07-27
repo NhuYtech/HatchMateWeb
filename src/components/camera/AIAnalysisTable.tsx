@@ -6,11 +6,9 @@ import {
   Image as ImageIcon, 
   MoreVertical, 
   Brain, 
-  ShieldCheck, 
-  AlertTriangle, 
-  XCircle,
   Download,
-  X
+  X,
+  ExternalLink
 } from "lucide-react";
 import { AiRecord } from "@/src/types/camera";
 import DataTablePagination from "@/src/components/common/DataTablePagination";
@@ -44,6 +42,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [previewRecord, setPreviewRecord] = useState<AiRecord | null>(null);
+  const [previewOriginalUrl, setPreviewOriginalUrl] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on click outside
@@ -66,29 +65,38 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
     setCurrentPage(1);
   }
 
-  const getStatusBadge = (status: AiRecord["resultStatus"]) => {
+  // Export CSV Report Functionality
+  const handleExportCsv = () => {
+    if (records.length === 0) return;
+    const headers = ["Thời gian", "Tên máy ấp", "Mã thiết bị", "Trạng thái AI", "Độ tin cậy (%)", "Chi tiết chẩn đoán", "Ghi chú"];
+    const rows = records.map((r) => [
+      `"${formatReadableDateTime(r.capturedAt)}"`,
+      `"${r.deviceName}"`,
+      `"${r.deviceId}"`,
+      `"${r.resultTitle}"`,
+      `"${r.confidence}%"`,
+      `"${r.resultSummary.replace(/"/g, '""')}"`,
+      `"${r.notes || 'Không có'}"`
+    ]);
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(row => row.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Bao_Cao_Phan_Tich_AI_HatchMate_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const getStatusText = (status: AiRecord["resultStatus"]) => {
     switch (status) {
       case "normal":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-100/50">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Bình thường
-          </span>
-        );
+        return <span className="font-semibold text-emerald-700 text-xs">Bình thường</span>;
       case "warning":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700 border border-amber-100">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Cảnh báo
-          </span>
-        );
+        return <span className="font-semibold text-amber-700 text-xs">Cảnh báo</span>;
       case "danger":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700 border border-rose-100">
-            <XCircle className="h-3.5 w-3.5 animate-pulse" />
-            Nguy hiểm
-          </span>
-        );
+        return <span className="font-semibold text-rose-700 text-xs animate-pulse">Nguy hiểm</span>;
     }
   };
 
@@ -122,7 +130,9 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-[16px] border border-sky-100 bg-sky-50/20 px-4 text-xs font-bold text-sky-700 shadow-sm transition hover:bg-sky-50 hover:text-sky-800 active:scale-95 duration-150 cursor-pointer"
+            onClick={handleExportCsv}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-[16px] border border-sky-100 bg-sky-50/40 px-4 text-xs font-bold text-sky-700 shadow-sm transition hover:bg-sky-100 active:scale-95 duration-150 cursor-pointer"
+            title="Xuất danh sách phân tích AI ra file CSV Excel"
           >
             <Download className="h-4 w-4 text-sky-600" />
             <span>Xuất báo cáo AI</span>
@@ -154,7 +164,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                 } hover:bg-sky-50/30`}
               >
                 {/* Thời gian chụp */}
-                <td className="px-6 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap font-mono">
+                <td className="px-6 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap">
                   {formatReadableDateTime(record.capturedAt)}
                 </td>
 
@@ -190,12 +200,12 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
 
                 {/* Kết quả AI */}
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {getStatusBadge(record.resultStatus)}
+                  {getStatusText(record.resultStatus)}
                 </td>
 
                 {/* Confidence */}
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="inline-flex rounded-lg bg-sky-50 border border-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700 font-mono">
+                  <span className="font-semibold text-slate-800 text-xs">
                     {record.confidence}%
                   </span>
                 </td>
@@ -247,7 +257,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                           type="button"
                           onClick={() => {
                             if (record.imageUrl) {
-                              window.open(record.imageUrl, '_blank');
+                              setPreviewOriginalUrl(record.imageUrl);
                             }
                             setActiveDropdownId(null);
                           }}
@@ -279,7 +289,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
         itemLabel="bản ghi phân tích"
       />
 
-      {/* Modal Xem chi tiết kết quả phân tích AI */}
+      {/* Modal 1: Xem chi tiết kết quả phân tích AI */}
       {previewRecord && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative max-w-xl w-full rounded-[28px] bg-white p-6 shadow-2xl border border-sky-100 flex flex-col gap-4">
@@ -311,14 +321,41 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500">KẾT QUẢ CHẨN ĐOÁN:</span>
-                {getStatusBadge(previewRecord.resultStatus)}
+                {getStatusText(previewRecord.resultStatus)}
               </div>
               <p className="text-sm font-bold text-sky-950">{previewRecord.resultTitle}</p>
               <p className="text-xs font-semibold text-slate-600 leading-relaxed">{previewRecord.resultSummary}</p>
-              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-slate-500 font-mono">
+              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-slate-500">
                 <span>Độ tin cậy: <strong className="text-sky-700">{previewRecord.confidence}%</strong></span>
                 <span>Mô hình: <strong>{previewRecord.processedBy}</strong></span>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Xem ảnh gốc phóng to */}
+      {previewOriginalUrl && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative max-w-4xl w-full rounded-[28px] bg-slate-900 p-5 shadow-2xl border border-white/10 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-white">
+                <ImageIcon className="h-5 w-5 text-sky-400" />
+                <h4 className="text-base font-extrabold">Xem ảnh gốc phóng to</h4>
+              </div>
+              <button
+                onClick={() => setPreviewOriginalUrl(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition cursor-pointer"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+            <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-white/10 flex items-center justify-center">
+              <img 
+                src={previewOriginalUrl} 
+                alt="Ảnh gốc" 
+                className="max-h-full max-w-full object-contain"
+              />
             </div>
           </div>
         </div>
