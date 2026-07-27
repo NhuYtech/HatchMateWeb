@@ -105,7 +105,7 @@ export default function CameraPage() {
         let totalEggs = activeCameras.reduce((sum, c) => sum + (c.eggCount || 0), 0);
         let onlineCount = activeCameras.filter((c) => c.status === "online").length;
         let analyzed = onlineCount > 0 ? onlineCount * 5 + 18 : 0;
-        let alerts = activeCameras.filter((c) => c.eggCount !== undefined && c.previousEggCount !== undefined && c.eggCount !== c.previousEggCount).length;
+        let alerts = activeCameras.filter((c) => c.isEggLost).length;
 
         // Dev fallback: show mock MATG01 camera when no real cameras in DB
         if (activeCameras.length === 0) {
@@ -193,7 +193,7 @@ export default function CameraPage() {
           accent="emerald"
         />
         <CameraMiniStatCard
-          label="Cảnh báo biến động"
+          label="Cảnh báo mất trứng"
           value={stats.variationAlerts}
           icon={Brain}
           accent="rose"
