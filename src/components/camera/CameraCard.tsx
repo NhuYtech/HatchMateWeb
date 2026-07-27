@@ -61,23 +61,21 @@ export default function CameraCard({ camera, onRefreshCapture, onViewDetail }: C
       <div>
         {/* Preview / Live Stream image slot */}
         <div className="relative aspect-video w-full rounded-[18px] bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 overflow-hidden flex items-center justify-center border border-slate-100">
-          {camera.streamUrl || (camera.ipAddress && camera.ipAddress.length > 5) ? (
+          {camera.previewImage ? (
+            <img 
+              src={camera.previewImage} 
+              alt={camera.cameraName} 
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : camera.streamUrl || (camera.ipAddress && camera.ipAddress.length > 5) ? (
             <img 
               src={camera.streamUrl || (camera.ipAddress?.startsWith('http') ? camera.ipAddress : `http://${camera.ipAddress}/stream`)} 
               alt={camera.cameraName} 
               className="absolute inset-0 h-full w-full object-cover"
               onError={(e) => {
-                // Fallback to static preview image if stream fails
-                if (camera.previewImage) {
-                  (e.target as HTMLImageElement).src = camera.previewImage;
-                }
+                // If stream connection is locked by Mobile App, hide broken image
+                (e.target as HTMLImageElement).style.display = "none";
               }}
-            />
-          ) : camera.previewImage ? (
-            <img 
-              src={camera.previewImage} 
-              alt={camera.cameraName} 
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
             <div className="relative h-full w-full flex items-center justify-center">
@@ -95,10 +93,19 @@ export default function CameraCard({ camera, onRefreshCapture, onViewDetail }: C
             </div>
           )}
 
-          {/* Dark capsule LIVE badge overlay matching Mobile App */}
+          {/* Dark capsule badge overlay */}
           <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-md px-2.5 py-1 text-[10px] font-extrabold text-white border border-white/10 shadow-sm">
-            <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-            <span>LIVE</span>
+            {camera.previewImage ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                <span>AI SNAPSHOT</span>
+              </>
+            ) : (
+              <>
+                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                <span>LIVE</span>
+              </>
+            )}
           </div>
         </div>
       </div>
