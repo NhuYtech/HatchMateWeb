@@ -48,17 +48,13 @@ export default function CameraTable({ cameras, onSelectCamera, onCaptureNew }: C
 
       {/* Responsive Table Wrapper */}
       <div className="overflow-x-auto relative min-h-[150px]">
-        <table className="w-full min-w-[1000px] border-collapse text-left text-sm whitespace-nowrap">
+        <table className="w-full min-w-[700px] border-collapse text-left text-sm whitespace-nowrap">
           <thead>
             <tr className="border-b border-slate-200 bg-white text-xs font-semibold text-slate-700">
-              <th className="px-4 py-2.5">Tên Camera</th>
-              <th className="px-4 py-2.5">Mã thiết bị</th>
-              <th className="px-4 py-2.5">Tên thiết bị</th>
-              <th className="px-4 py-2.5">Số trứng quét</th>
-              <th className="px-4 py-2.5">Trạng thái</th>
-              <th className="px-4 py-2.5">Nhận diện AI</th>
-              <th className="px-4 py-2.5">Cập nhật cuối</th>
-              <th className="px-4 py-2.5 text-center">Hành động</th>
+              <th className="px-5 py-3">Thông tin Máy ấp</th>
+              <th className="px-5 py-3">Thông tin Camera</th>
+              <th className="px-5 py-3">Trạng thái</th>
+              <th className="px-5 py-3 text-center">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -66,64 +62,53 @@ export default function CameraTable({ cameras, onSelectCamera, onCaptureNew }: C
               <tr
                 key={camera.id}
                 className={`group transition-colors duration-150 ${
-                  index % 2 === 0 ? "bg-white" : "bg-[#F5F7FA]"
+                  index % 2 === 0 ? "bg-white" : "bg-[#F8FAFC]"
                 } hover:bg-sky-50/30`}
               >
-                {/* Tên Camera */}
-                <td className="px-4 py-2.5 font-semibold text-slate-900">
-                  {camera.cameraName}
+                {/* Thông tin Máy ấp */}
+                <td className="px-5 py-3">
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-sky-950 text-sm">{camera.deviceName}</p>
+                    <p className="font-mono text-xs text-slate-400 font-semibold">{camera.deviceId}</p>
+                  </div>
                 </td>
 
-                {/* Mã thiết bị */}
-                <td className="px-4 py-2.5 font-mono text-xs font-semibold text-slate-800">
-                  {camera.deviceId}
-                </td>
-
-                {/* Tên thiết bị */}
-                <td className="px-4 py-2.5 text-slate-900 font-medium">
-                  {camera.deviceName}
-                </td>
-
-                {/* Số trứng quét */}
-                <td className="px-4 py-2.5 font-bold text-slate-900">
-                  {camera.eggCount !== undefined ? `${camera.eggCount} quả` : "–"}
+                {/* Thông tin Camera */}
+                <td className="px-5 py-3">
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-slate-800 text-sm">{camera.cameraName}</p>
+                    <p className="text-xs text-slate-400 font-mono font-medium">
+                      IP: {camera.ipAddress || "192.168.88.220"} · {camera.locationLabel}
+                    </p>
+                  </div>
                 </td>
 
                 {/* Trạng thái */}
-                <td className="px-4 py-2.5 text-slate-900 font-semibold">
-                  {camera.status === "online" ? "Đang hoạt động" : "Ngoại tuyến"}
+                <td className="px-5 py-3">
+                  {camera.status === "online" ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-100">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Đang hoạt động
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500 border border-slate-200">
+                      <span className="h-2 w-2 rounded-full bg-slate-400" />
+                      Ngoại tuyến
+                    </span>
+                  )}
                 </td>
 
-                {/* Nhận diện AI */}
-                <td className="px-4 py-2.5 text-slate-900 font-semibold">
-                  {getAiLabel(camera.aiStatus)}
-                </td>
-
-                {/* Cập nhật cuối */}
-                <td className="px-4 py-2.5 text-xs font-semibold text-slate-400">
-                  {camera.lastCaptureAt}
-                </td>
-
-                {/* Hành động */}
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onSelectCamera && onSelectCamera(camera)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-800 hover:bg-slate-100 transition active:scale-95 duration-100 cursor-pointer"
-                      title="Xem Camera"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onCaptureNew && onCaptureNew(camera.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-800 hover:bg-slate-100 transition active:scale-95 duration-100 cursor-pointer"
-                      title="Chụp ảnh mới"
-                    >
-                      <Camera className="h-4 w-4" />
-                    </button>
-                  </div>
+                {/* Thao tác */}
+                <td className="px-5 py-3 text-center">
+                  <button
+                    type="button"
+                    onClick={() => onSelectCamera && onSelectCamera(camera)}
+                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-sky-100 bg-sky-50 px-3 text-xs font-bold text-sky-700 shadow-sm transition hover:bg-sky-100 active:scale-95 duration-100 cursor-pointer"
+                    title="Xem chi tiết Camera"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    <span>Xem chi tiết</span>
+                  </button>
                 </td>
               </tr>
             ))}
