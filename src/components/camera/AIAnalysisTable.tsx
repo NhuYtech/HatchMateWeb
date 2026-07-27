@@ -291,15 +291,15 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
         itemLabel="bản ghi phân tích"
       />
 
-      {/* Modal 1: Xem chi tiết kết quả phân tích AI */}
+      {/* Modal 1: Xem chi tiết kết quả phân tích AI - Căn giữa tiêu đề, ảnh vừa vặn không bị bóp đen */}
       {previewRecord && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative max-w-xl w-full rounded-[28px] bg-white p-6 shadow-2xl border border-sky-100 flex flex-col gap-4">
+          <div className="relative max-w-2xl w-full rounded-[28px] bg-white p-6 shadow-2xl border border-sky-100 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
             <div className="relative border-b border-slate-100 pb-3 text-center">
               <h4 className="text-base font-extrabold text-sky-950 uppercase tracking-wide">
                 CHI TIẾT PHÂN TÍCH AI (YOLOV8)
               </h4>
-              <p className="text-xs text-slate-500 font-semibold mt-0.5">
+              <p className="text-xs text-slate-500 font-semibold mt-1">
                 Thiết bị: {previewRecord.deviceName} · Thời gian: {formatReadableDateTime(previewRecord.capturedAt)}
               </p>
               <button
@@ -310,15 +310,18 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
               </button>
             </div>
 
-            <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 flex items-center justify-center">
+            <div className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 shadow-sm flex items-center justify-center">
               {previewRecord.imageUrl ? (
                 <img 
                   src={previewRecord.imageUrl} 
                   alt={previewRecord.resultTitle} 
-                  className="max-h-full max-w-full object-contain"
+                  className="w-full h-auto max-h-[60vh] object-contain rounded-2xl"
                 />
               ) : (
-                <ImageIcon className="h-10 w-10 text-slate-600" />
+                <div className="py-12 flex flex-col items-center justify-center text-slate-400">
+                  <ImageIcon className="h-10 w-10 mb-2 text-slate-600" />
+                  <p className="text-xs font-semibold">Chưa có ảnh phân tích</p>
+                </div>
               )}
             </div>
 
@@ -338,27 +341,27 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
         </div>
       )}
 
-      {/* Modal 2: Xem ảnh gốc phóng to */}
+      {/* Modal 2: Xem ảnh gốc phóng to - Đẹp mắt, không bị viền lồng viền */}
       {previewOriginalUrl && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative max-w-4xl w-full rounded-[28px] bg-slate-900 p-5 shadow-2xl border border-white/10 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-white">
-                <ImageIcon className="h-5 w-5 text-sky-400" />
-                <h4 className="text-base font-extrabold uppercase tracking-wide">XEM ẢNH GỐC PHÓNG TO</h4>
-              </div>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative max-w-3xl w-full rounded-[28px] bg-white p-6 shadow-2xl border border-sky-100 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="relative border-b border-slate-100 pb-3 text-center">
+              <h4 className="text-base font-extrabold text-sky-950 uppercase tracking-wide">
+                XEM ẢNH GỐC PHÓNG TO
+              </h4>
               <button
                 onClick={() => setPreviewOriginalUrl(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition cursor-pointer"
+                className="absolute right-0 top-0 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition cursor-pointer"
               >
-                <X className="h-4.5 w-4.5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-white/10 flex items-center justify-center">
+
+            <div className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 shadow-sm flex items-center justify-center">
               <img 
                 src={previewOriginalUrl} 
                 alt="Ảnh gốc" 
-                className="max-h-full max-w-full object-contain"
+                className="w-full h-auto max-h-[70vh] object-contain rounded-2xl"
               />
             </div>
           </div>
