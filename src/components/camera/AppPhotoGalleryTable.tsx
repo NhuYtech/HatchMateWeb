@@ -1,0 +1,196 @@
+"use client";
+
+import React, { useState } from "react";
+import { Image as ImageIcon, Camera, Clock, Smartphone, Sparkles, ExternalLink, X } from "lucide-react";
+import { PhotoRecord } from "@/src/types/camera";
+import DataTablePagination from "@/src/components/common/DataTablePagination";
+
+interface AppPhotoGalleryTableProps {
+  photos: PhotoRecord[];
+}
+
+export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTableProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [previewPhoto, setPreviewPhoto] = useState<PhotoRecord | null>(null);
+
+  if (photos.length === 0) {
+    return (
+      <div className="rounded-[24px] border border-sky-100/80 bg-white p-12 text-center shadow-sm shadow-sky-100/10">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 shadow-sm">
+          <ImageIcon className="h-7 w-7 stroke-[2]" />
+        </div>
+        <h3 className="text-base font-bold text-sky-950">Chưa có lịch sử ảnh chụp từ App</h3>
+        <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500 leading-relaxed">
+          Ảnh chụp thủ công hoặc tự động từ ứng dụng di động sẽ tự động đồng bộ và xuất hiện tại đây.
+        </p>
+      </div>
+    );
+  }
+
+  const paginatedPhotos = photos.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const getTypeBadge = (type: PhotoRecord["type"]) => {
+    switch (type) {
+      case "manual":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-bold text-sky-700 border border-sky-100">
+            <Smartphone className="h-3.5 w-3.5" />
+            Thủ công (App)
+          </span>
+        );
+      case "auto":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700 border border-amber-100">
+            <Clock className="h-3.5 w-3.5" />
+            Định kỳ (3h)
+          </span>
+        );
+      case "ai":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700 border border-purple-100">
+            <Sparkles className="h-3.5 w-3.5" />
+            AI Nhận diện
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-0.5 text-xs font-bold text-slate-600 border border-slate-200">
+            <Camera className="h-3.5 w-3.5" />
+            Ảnh chụp
+          </span>
+        );
+    }
+  };
+
+  return (
+    <div className="rounded-[24px] border border-sky-100/80 bg-white shadow-sm shadow-sky-100/10 overflow-hidden">
+      {/* Header */}
+      <div className="border-b border-slate-100 bg-white px-6 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
+            Lịch sử ảnh chụp từ App & Web ({photos.length} ảnh)
+          </h3>
+          <p className="text-xs text-slate-500">
+            Tất cả hình ảnh được chụp thủ công hoặc tự động từ App di động đã đồng bộ về hệ thống
+          </p>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto relative min-h-[180px]">
+        <table className="w-full min-w-[900px] border-collapse text-left text-sm whitespace-nowrap">
+          <thead>
+            <tr className="border-b border-slate-200 bg-white text-xs font-semibold text-slate-700">
+              <th className="px-5 py-3">Xem ảnh</th>
+              <th className="px-5 py-3">Tên sự kiện</th>
+              <th className="px-5 py-3">Tên máy ấp</th>
+              <th className="px-5 py-3">Loại chụp</th>
+              <th className="px-5 py-3">Thời gian chụp</th>
+              <th className="px-5 py-3 text-center">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {paginatedPhotos.map((photo, index) => (
+              <tr
+                key={photo.id}
+                className={`group transition-colors duration-150 ${
+                  index % 2 === 0 ? "bg-white" : "bg-[#F8FAFC]"
+                } hover:bg-sky-50/40`}
+              >
+                {/* Image Thumbnail */}
+                <td className="px-5 py-3">
+                  <div 
+                    onClick={() => setPreviewPhoto(photo)}
+                    className="relative h-12 w-20 rounded-xl overflow-hidden bg-slate-900 border border-slate-200 cursor-pointer group-hover:shadow-md transition duration-200"
+                  >
+                    {photo.imageUrl ? (
+                      <img 
+                        src={photo.imageUrl} 
+                        alt={photo.title} 
+                        className="h-full w-full object-cover group-hover:scale-105 transition duration-200"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-400">
+                        <ImageIcon className="h-5 w-5" />
+                      </div>
+                    )}
+                  </div>
+                </td>
+
+                {/* Event Title */}
+                <td className="px-5 py-3 font-bold text-sky-950">
+                  {photo.title}
+                </td>
+
+                {/* Device Name */}
+                <td className="px-5 py-3 font-semibold text-slate-700">
+                  {photo.deviceName}
+                </td>
+
+                {/* Type Badge */}
+                <td className="px-5 py-3">
+                  {getTypeBadge(photo.type)}
+                </td>
+
+                {/* Time */}
+                <td className="px-5 py-3 text-xs font-mono font-semibold text-slate-500">
+                  {photo.time}
+                </td>
+
+                {/* Action */}
+                <td className="px-5 py-3 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewPhoto(photo)}
+                    className="inline-flex h-8 items-center gap-1 px-3 rounded-lg border border-sky-100 bg-sky-50 text-xs font-bold text-sky-700 hover:bg-sky-100 transition duration-150 cursor-pointer"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>Xem phóng to</span>
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      <DataTablePagination
+        currentPage={currentPage}
+        pageSize={pageSize}
+        totalItems={photos.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+        itemLabel="bức ảnh"
+      />
+
+      {/* Lightbox Modal */}
+      {previewPhoto && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative max-w-2xl w-full rounded-[28px] bg-slate-900 p-5 shadow-2xl border border-white/10 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-base font-extrabold text-white">{previewPhoto.title}</h4>
+                <p className="text-xs text-slate-400 font-semibold">{previewPhoto.deviceName} · {previewPhoto.time}</p>
+              </div>
+              <button
+                onClick={() => setPreviewPhoto(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition cursor-pointer"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+            <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black border border-white/10 flex items-center justify-center">
+              <img 
+                src={previewPhoto.imageUrl} 
+                alt={previewPhoto.title} 
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

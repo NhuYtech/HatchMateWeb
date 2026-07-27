@@ -49,3 +49,12 @@ export interface AiRecord {
   processedBy: string;
   notes?: string | null;
 }
+
+export interface PhotoRecord {
+  id: string;
+  title: string;
+  time: string;
+  imageUrl: string;
+  type: "manual" | "auto" | "ai";
+  deviceName: string;
+}

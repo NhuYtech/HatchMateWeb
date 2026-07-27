@@ -6,15 +6,15 @@ import CameraMiniStatCard from "@/src/components/camera/CameraMiniStatCard";
 import CameraGrid from "@/src/components/camera/CameraGrid";
 import CameraTable from "@/src/components/camera/CameraTable";
 import AIAnalysisTable from "@/src/components/camera/AIAnalysisTable";
+import AppPhotoGalleryTable from "@/src/components/camera/AppPhotoGalleryTable";
 import CameraDetailModal from "@/src/components/camera/CameraDetailModal";
 
 import { ref, onValue } from "firebase/database";
 import { rtdb } from "@/src/lib/firebase";
-import { CameraItem, AiRecord } from "@/src/types/camera";
+import { CameraItem, AiRecord, PhotoRecord } from "@/src/types/camera";
 import { 
   Video,
   ShieldCheck,
-  Camera,
   Brain,
   VideoOff
 } from "lucide-react";
@@ -23,9 +23,9 @@ export default function CameraPage() {
   const [selectedCamera, setSelectedCamera] = useState<CameraItem | null>(null);
   const [cameras, setCameras] = useState<CameraItem[]>([]);
   const [aiRecords, setAiRecords] = useState<AiRecord[]>([]);
+  const [photoRecords, setPhotoRecords] = useState<PhotoRecord[]>([]);
   const [stats, setStats] = useState({
     totalCameras: 0,
-    totalEggs: 0,
     analyzedImages: 0,
     variationAlerts: 0,
   });
@@ -39,6 +39,7 @@ export default function CameraPage() {
         const data = snapshot.val();
         const activeCameras: CameraItem[] = [];
         const activeAiRecords: AiRecord[] = [];
+        const activePhotos: PhotoRecord[] = [];
 
         Object.keys(data).forEach((key) => {
           const item = data[key];
@@ -102,13 +103,15 @@ export default function CameraPage() {
                 processedBy: "HatchMate YOLOv8 AI",
                 notes: null,
               });
-              // Parse AI events list saved from Mobile App or Web for realtime sync
+
+              // Parse AI events and captured photos list synced from Mobile App & Web
               if (item.ai_events && typeof item.ai_events === "object") {
                 Object.keys(item.ai_events).forEach((evKey) => {
                   const ev = item.ai_events[evKey];
                   if (ev && typeof ev === "object") {
                     const evEggCount = ev.eggCount !== undefined ? Number(ev.eggCount) : eggCount;
                     const evIsLost = evEggCount < initialEggCount && initialEggCount > 0;
+                    
                     activeAiRecords.unshift({
                       id: `ai-event-${evKey}`,
                       cameraId: `cam-${key}`,
@@ -125,6 +128,18 @@ export default function CameraPage() {
                       processedBy: "HatchMate App Sync",
                       notes: null,
                     });
+
+                    // Add to Photo Gallery (App to Web Photo Sync)
+                    if (ev.imageUrl || ev.image) {
+                      activePhotos.unshift({
+                        id: `photo-${evKey}`,
+                        title: ev.title || "Ảnh chụp từ ứng dụng",
+                        time: ev.time || ev.timestamp || lastSeen,
+                        imageUrl: ev.imageUrl || ev.image,
+                        type: (ev.type as any) || "manual",
+                        deviceName,
+                      });
+                    }
                   }
                 });
               }
@@ -133,9 +148,8 @@ export default function CameraPage() {
         });
 
         let total = activeCameras.length;
-        let totalEggs = activeCameras.reduce((sum, c) => sum + (c.eggCount || 0), 0);
         let onlineCount = activeCameras.filter((c) => c.status === "online").length;
-        let analyzed = onlineCount > 0 ? onlineCount * 5 + 18 : 0;
+        let analyzed = activeAiRecords.length > 0 ? activeAiRecords.length : (onlineCount > 0 ? onlineCount * 5 + 18 : 0);
         let alerts = activeCameras.filter((c) => c.isEggLost).length;
 
         // Dev fallback: show mock MATG01 camera when no real cameras in DB
@@ -159,14 +173,22 @@ export default function CameraPage() {
             resultSummary: "AI nhận diện thành công: 24 quả trứng, không có thay đổi",
             confidence: 94, processedBy: "HatchMate AI v1.0", notes: null
           });
-          total = 1; totalEggs = 24; analyzed = 24; alerts = 0;
+          activePhotos.push({
+            id: "photo-MATG01-1",
+            title: "Ảnh chụp thủ công (Người dùng)",
+            time: new Date().toLocaleTimeString("vi-VN"),
+            imageUrl: "/incubator_eggs.png",
+            type: "manual",
+            deviceName: "MATG01",
+          });
+          total = 1; analyzed = 24; alerts = 0;
         }
 
         setCameras(activeCameras);
         setAiRecords(activeAiRecords);
+        setPhotoRecords(activePhotos);
         setStats({
           totalCameras: total,
-          totalEggs,
           analyzedImages: analyzed,
           variationAlerts: alerts,
         });
@@ -188,10 +210,18 @@ export default function CameraPage() {
           id: "ai-MATG01", cameraId: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
           capturedAt: new Date().toLocaleTimeString("vi-VN"), imageUrl: "/incubator_eggs.png",
           resultStatus: "normal", resultTitle: "Số lượng ổn định",
-          resultSummary: "AI nhận diện thành công: 9 quả trứng, không có thay đổi",
-          confidence: 74, processedBy: "HatchMate AI v1.0", notes: null
+          resultSummary: "AI nhận diện thành công: 24 quả trứng, không có thay đổi",
+          confidence: 94, processedBy: "HatchMate AI v1.0", notes: null
         }]);
-        setStats({ totalCameras: 1, totalEggs: 9, analyzedImages: 24, variationAlerts: 0 });
+        setPhotoRecords([{
+          id: "photo-MATG01-1",
+          title: "Ảnh chụp thủ công (Người dùng)",
+          time: new Date().toLocaleTimeString("vi-VN"),
+          imageUrl: "/incubator_eggs.png",
+          type: "manual",
+          deviceName: "MATG01",
+        }]);
+        setStats({ totalCameras: 1, analyzedImages: 24, variationAlerts: 0 });
       }
       setLoading(false);
     }, (err) => {
@@ -203,23 +233,17 @@ export default function CameraPage() {
   }, []);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-6">
       {/* Header */}
       <CameraPageHeader totalCameras={stats.totalCameras} />
 
-      {/* Mini Stats Component Section */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 1. Thống kê Mini (Chỉ giữ 3 thẻ: Tổng camera, Ảnh đã phân tích, Cảnh báo mất trứng) */}
+      <section className="grid gap-4 sm:grid-cols-3">
         <CameraMiniStatCard
           label="Tổng camera"
           value={stats.totalCameras}
           icon={Video}
           accent="indigo"
-        />
-        <CameraMiniStatCard
-          label="Tổng trứng quét"
-          value={stats.totalEggs}
-          icon={Camera}
-          accent="sky"
         />
         <CameraMiniStatCard
           label="Ảnh đã phân tích"
@@ -235,7 +259,7 @@ export default function CameraPage() {
         />
       </section>
 
-      {/* Camera Grid & Table Section */}
+      {/* 2. Thẻ chứa thông tin máy ấp và camera */}
       {loading ? (
         <div className="flex h-32 items-center justify-center text-xs text-slate-400 font-semibold">
           Đang tải thông tin camera...
@@ -247,16 +271,18 @@ export default function CameraPage() {
           </div>
           <h3 className="text-base font-bold text-sky-950">Chưa có camera nào</h3>
           <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500 leading-relaxed">
-            Hiện tại không tìm thấy thiết bị camera nào khớp với tiêu chí tìm kiếm hoặc trạng thái của bộ lọc.
+            Hiện tại không tìm thấy thiết bị camera nào kết nối trong hệ thống.
           </p>
         </div>
       ) : (
         <>
+          {/* Thẻ chứa thông tin máy ấp & camera */}
           <CameraGrid 
             cameras={cameras} 
             onViewDetail={setSelectedCamera}
           />
           
+          {/* 3. Danh sách camera */}
           <CameraTable 
             cameras={cameras}
             onSelectCamera={setSelectedCamera}
@@ -267,8 +293,11 @@ export default function CameraPage() {
         </>
       )}
 
-      {/* AI Analysis Section */}
+      {/* 4. Lịch sử phân tích của AI */}
       {!loading && aiRecords.length > 0 && <AIAnalysisTable records={aiRecords} />}
+
+      {/* 5. Lịch sử ảnh đã được chụp sẽ được đưa từ app về web */}
+      {!loading && <AppPhotoGalleryTable photos={photoRecords} />}
 
       {/* Camera Detail Modal */}
       {selectedCamera && (
