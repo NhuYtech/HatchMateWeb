@@ -9,6 +9,25 @@ interface AppPhotoGalleryTableProps {
   photos: PhotoRecord[];
 }
 
+function formatReadableDateTime(timeStr: string): string {
+  if (!timeStr) return "Vừa xong";
+  if (timeStr.includes(" - ") || timeStr.includes("Vừa xong")) return timeStr;
+  
+  try {
+    const d = new Date(timeStr);
+    if (!isNaN(d.getTime())) {
+      const hours = d.getHours().toString().padStart(2, "0");
+      const minutes = d.getMinutes().toString().padStart(2, "0");
+      const seconds = d.getSeconds().toString().padStart(2, "0");
+      const day = d.getDate().toString().padStart(2, "0");
+      const month = (d.getMonth() + 1).toString().padStart(2, "0");
+      const year = d.getFullYear();
+      return `${hours}:${minutes}:${seconds} - ${day}/${month}/${year}`;
+    }
+  } catch (_) {}
+  return timeStr;
+}
+
 export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -132,7 +151,7 @@ export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTablePro
 
                 {/* Time */}
                 <td className="px-5 py-3 text-xs font-mono font-semibold text-slate-500">
-                  {photo.time}
+                  {formatReadableDateTime(photo.time)}
                 </td>
 
                 {/* Action */}
@@ -169,7 +188,7 @@ export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTablePro
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-base font-extrabold text-white">{previewPhoto.title}</h4>
-                <p className="text-xs text-slate-400 font-semibold">{previewPhoto.deviceName} · {previewPhoto.time}</p>
+                <p className="text-xs text-slate-400 font-semibold">{previewPhoto.deviceName} · {formatReadableDateTime(previewPhoto.time)}</p>
               </div>
               <button
                 onClick={() => setPreviewPhoto(null)}

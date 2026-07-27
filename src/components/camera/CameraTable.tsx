@@ -75,7 +75,7 @@ export default function CameraTable({ cameras, onSelectCamera, onCaptureNew }: C
                 {/* Thông tin Camera */}
                 <td className="px-5 py-3">
                   <div className="space-y-0.5">
-                    <p className="font-bold text-slate-800 text-sm">{camera.cameraName}</p>
+                    <p className="font-bold text-slate-800 text-sm">HatchMate-Cam</p>
                     <p className="text-xs text-slate-400 font-mono font-medium">
                       IP: {camera.ipAddress || "192.168.88.220"} · {camera.locationLabel}
                     </p>

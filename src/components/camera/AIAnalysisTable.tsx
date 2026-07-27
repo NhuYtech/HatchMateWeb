@@ -10,7 +10,7 @@ import {
   AlertTriangle, 
   XCircle,
   Download,
-  RotateCw
+  X
 } from "lucide-react";
 import { AiRecord } from "@/src/types/camera";
 import DataTablePagination from "@/src/components/common/DataTablePagination";
@@ -20,10 +20,30 @@ interface AIAnalysisTableProps {
   onRefresh?: () => void;
 }
 
+function formatReadableDateTime(timeStr: string): string {
+  if (!timeStr) return "Vừa xong";
+  if (timeStr.includes(" - ") || timeStr.includes("Vừa xong")) return timeStr;
+  
+  try {
+    const d = new Date(timeStr);
+    if (!isNaN(d.getTime())) {
+      const hours = d.getHours().toString().padStart(2, "0");
+      const minutes = d.getMinutes().toString().padStart(2, "0");
+      const seconds = d.getSeconds().toString().padStart(2, "0");
+      const day = d.getDate().toString().padStart(2, "0");
+      const month = (d.getMonth() + 1).toString().padStart(2, "0");
+      const year = d.getFullYear();
+      return `${hours}:${minutes}:${seconds} - ${day}/${month}/${year}`;
+    }
+  } catch (_) {}
+  return timeStr;
+}
+
 export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableProps) {
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [previewRecord, setPreviewRecord] = useState<AiRecord | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on click outside
@@ -39,7 +59,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
     };
   }, []);
 
-  // Reset to page 1 if records list changes (Render-phase state adjustment)
+  // Reset to page 1 if records list changes
   const [prevRecords, setPrevRecords] = useState(records);
   if (records !== prevRecords) {
     setPrevRecords(records);
@@ -102,7 +122,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-[16px] border border-sky-100 bg-sky-50/20 px-4 text-xs font-bold text-sky-700 shadow-sm transition hover:bg-sky-50 hover:text-sky-800 active:scale-95 duration-150"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-[16px] border border-sky-100 bg-sky-50/20 px-4 text-xs font-bold text-sky-700 shadow-sm transition hover:bg-sky-50 hover:text-sky-800 active:scale-95 duration-150 cursor-pointer"
           >
             <Download className="h-4 w-4 text-sky-600" />
             <span>Xuất báo cáo AI</span>
@@ -134,18 +154,21 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                 } hover:bg-sky-50/30`}
               >
                 {/* Thời gian chụp */}
-                <td className="px-6 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap">
-                  {record.capturedAt}
+                <td className="px-6 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap font-mono">
+                  {formatReadableDateTime(record.capturedAt)}
                 </td>
 
                 {/* Ảnh quét */}
                 <td className="px-6 py-4">
-                  <div className="relative h-12 w-16 shrink-0 rounded-lg bg-slate-900 border border-slate-200 overflow-hidden flex items-center justify-center">
+                  <div 
+                    onClick={() => setPreviewRecord(record)}
+                    className="relative h-12 w-16 shrink-0 rounded-lg bg-slate-900 border border-slate-200 overflow-hidden flex items-center justify-center cursor-pointer hover:shadow-md transition"
+                  >
                     {record.imageUrl ? (
                       <img 
                         src={record.imageUrl} 
                         alt={record.resultTitle} 
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover group-hover:scale-105 transition duration-200"
                       />
                     ) : (
                       <ImageIcon className="h-5 w-5 text-slate-600" />
@@ -160,7 +183,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                       {record.deviceName}
                     </div>
                     <p className="text-[10px] text-slate-400 font-semibold font-mono mt-0.5">
-                      {record.cameraId} · {record.deviceId}
+                      HatchMate-Cam · {record.deviceId}
                     </p>
                   </div>
                 </td>
@@ -172,7 +195,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
 
                 {/* Confidence */}
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="inline-flex rounded-lg bg-sky-50 border border-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700">
+                  <span className="inline-flex rounded-lg bg-sky-50 border border-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700 font-mono">
                     {record.confidence}%
                   </span>
                 </td>
@@ -198,7 +221,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                     <button
                       type="button"
                       onClick={() => setActiveDropdownId(activeDropdownId === record.id ? null : record.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-sky-50 hover:text-sky-600 transition duration-150"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-sky-50 hover:text-sky-600 transition duration-150 cursor-pointer"
                       title="Tác vụ"
                     >
                       <MoreVertical className="h-4 w-4" />
@@ -207,21 +230,31 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                     {activeDropdownId === record.id && (
                       <div 
                         ref={dropdownRef}
-                        className="absolute right-0 top-full z-[100] mt-1 w-40 rounded-xl border border-sky-100 bg-white p-1.5 shadow-xl animate-in fade-in duration-100"
+                        className="absolute right-0 top-full z-[100] mt-1 w-36 rounded-xl border border-sky-100 bg-white p-1.5 shadow-xl animate-in fade-in duration-100"
                       >
                         <button
                           type="button"
-                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-sky-950 hover:bg-sky-50 transition"
+                          onClick={() => {
+                            setPreviewRecord(record);
+                            setActiveDropdownId(null);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-sky-950 hover:bg-sky-50 transition cursor-pointer"
                         >
-                          <Eye className="h-3.5 w-3.5 text-slate-400" />
-                          Xem chi tiết
+                          <Eye className="h-3.5 w-3.5 text-sky-600" />
+                          <span>Xem chi tiết</span>
                         </button>
                         <button
                           type="button"
-                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-sky-950 hover:bg-sky-50 transition"
+                          onClick={() => {
+                            if (record.imageUrl) {
+                              window.open(record.imageUrl, '_blank');
+                            }
+                            setActiveDropdownId(null);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-sky-950 hover:bg-sky-50 transition cursor-pointer"
                         >
-                          <ImageIcon className="h-3.5 w-3.5 text-slate-400" />
-                          Xem ảnh gốc
+                          <ImageIcon className="h-3.5 w-3.5 text-slate-500" />
+                          <span>Xem ảnh gốc</span>
                         </button>
                       </div>
                     )}
@@ -245,6 +278,51 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
         }}
         itemLabel="bản ghi phân tích"
       />
+
+      {/* Modal Xem chi tiết kết quả phân tích AI */}
+      {previewRecord && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative max-w-xl w-full rounded-[28px] bg-white p-6 shadow-2xl border border-sky-100 flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h4 className="text-base font-extrabold text-sky-950">Chi tiết Phân tích AI (YOLOv8)</h4>
+                <p className="text-xs text-slate-500 font-semibold">Thiết bị: {previewRecord.deviceName} · Thời gian: {formatReadableDateTime(previewRecord.capturedAt)}</p>
+              </div>
+              <button
+                onClick={() => setPreviewRecord(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition cursor-pointer"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-200 flex items-center justify-center">
+              {previewRecord.imageUrl ? (
+                <img 
+                  src={previewRecord.imageUrl} 
+                  alt={previewRecord.resultTitle} 
+                  className="max-h-full max-w-full object-contain"
+                />
+              ) : (
+                <ImageIcon className="h-10 w-10 text-slate-600" />
+              )}
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500">KẾT QUẢ CHẨN ĐOÁN:</span>
+                {getStatusBadge(previewRecord.resultStatus)}
+              </div>
+              <p className="text-sm font-bold text-sky-950">{previewRecord.resultTitle}</p>
+              <p className="text-xs font-semibold text-slate-600 leading-relaxed">{previewRecord.resultSummary}</p>
+              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-slate-500 font-mono">
+                <span>Độ tin cậy: <strong className="text-sky-700">{previewRecord.confidence}%</strong></span>
+                <span>Mô hình: <strong>{previewRecord.processedBy}</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

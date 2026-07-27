@@ -65,7 +65,7 @@ export default function CameraPage() {
                 id: `cam-${key}`,
                 deviceId: key,
                 deviceName: deviceName,
-                cameraName: `Cam ${deviceName}`,
+                cameraName: "HatchMate-Cam",
                 locationLabel: "Trạm ấp",
                 status: status === "offline" ? "offline" : "online",
                 previewImage: item.camera?.previewImage ?? null,
