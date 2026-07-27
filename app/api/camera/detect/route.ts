@@ -21,8 +21,9 @@ export async function POST(request: Request) {
     // 2. Forward image to FastAPI AI Server running YOLOv8l
     const aiServerUrl = process.env.AI_SERVER_URL || "http://127.0.0.1:8000/predict";
     let aiResult = {
+      success: false,
       detectedCount: 0,
-      confidence: 0.98,
+      confidence: 0.0,
       processedImageBase64: ""
     };
 
@@ -46,8 +47,15 @@ export async function POST(request: Request) {
     }
 
     const timestamp = Date.now();
-    let rawImageUrl = "http://localhost:3000/fallback_raw.jpg";
-    let aiImageUrl = "http://localhost:3000/fallback_ai.jpg";
+    const appBaseUrl = process.env.APP_URL || "";
+    let rawImageUrl = appBaseUrl ? `${appBaseUrl}/fallback_raw.jpg` : "/fallback_raw.jpg";
+    let aiImageUrl = appBaseUrl ? `${appBaseUrl}/fallback_ai.jpg` : "/fallback_ai.jpg";
+    const aiSuccess = Boolean(
+      aiResult.success &&
+      aiResult.processedImageBase64 &&
+      typeof aiResult.detectedCount === "number" &&
+      aiResult.detectedCount >= 0
+    );
 
     if (isFirebaseAdminConfigured) {
       // 3. Upload Raw Image to Firebase Storage
@@ -80,28 +88,40 @@ export async function POST(request: Request) {
         }
       }
 
-      // 5. Read previous egg count from RTDB to determine changes for notifications
-      let previousEggCount = 24; // default fallback
+      // 5. Read initial & previous egg count from RTDB to determine egg loss & FCM alerts
+      let previousEggCount = 24;
+      let initialEggCount = 24;
       try {
         const eggCountRef = adminRtdb.ref(`incubators/${deviceId}/telemetry/eggCount`);
         const eggCountSnapshot = await eggCountRef.once("value");
         if (eggCountSnapshot.exists()) {
           previousEggCount = Number(eggCountSnapshot.val());
         }
+
+        const initialEggCountRef = adminRtdb.ref(`incubators/${deviceId}/cycle/initialEggCount`);
+        const initialSnapshot = await initialEggCountRef.once("value");
+        if (initialSnapshot.exists()) {
+          initialEggCount = Number(initialSnapshot.val());
+        } else {
+          initialEggCount = previousEggCount;
+        }
       } catch (rtdbErr: any) {
         console.warn("Firebase RTDB fetch failed:", rtdbErr.message || rtdbErr);
       }
 
-      const currentEggCount = aiResult.detectedCount;
-      const countChanged = currentEggCount !== previousEggCount;
+      // Preserve previous egg count if AI failed, avoiding false zero-count telemetry & FCM alerts
+      const currentEggCount = aiSuccess ? aiResult.detectedCount : previousEggCount;
+      const countChanged = aiSuccess && (currentEggCount !== previousEggCount);
+      const isEggLost = aiSuccess && (currentEggCount < initialEggCount);
+      const labelText = aiSuccess ? `${currentEggCount}` : "Chờ AI phân tích";
 
       // 6. Update Firestore camera collection (matching current Flutter App structure)
       try {
         await adminDb.collection("camera").doc("current").set({
           latestImageUrl: rawImageUrl,
           aiImageUrl: aiImageUrl,
-          detectedLabel: `${currentEggCount}`,
-          confidence: aiResult.confidence,
+          detectedLabel: labelText,
+          confidence: aiSuccess ? aiResult.confidence : 0,
           updatedAt: FieldValue.serverTimestamp()
         }, { merge: true });
 
@@ -109,8 +129,8 @@ export async function POST(request: Request) {
         await adminDb.collection("incubators").doc(deviceId).collection("camera_frames").add({
           latestImageUrl: rawImageUrl,
           aiImageUrl: aiImageUrl,
-          detectedLabel: `${currentEggCount}`,
-          confidence: aiResult.confidence,
+          detectedLabel: labelText,
+          confidence: aiSuccess ? aiResult.confidence : 0,
           updatedAt: FieldValue.serverTimestamp()
         });
       } catch (firestoreErr: any) {
@@ -119,30 +139,59 @@ export async function POST(request: Request) {
 
       // 7. Update Realtime Database incubator telemetry & status
       try {
-        await adminRtdb.ref(`incubators/${deviceId}/telemetry`).update({
-          eggCount: currentEggCount,
-          lastSeen: new Date().toLocaleTimeString("vi-VN")
-        });
+        // Only update eggCount in telemetry if AI detection succeeded
+        const telemetryUpdate: Record<string, any> = {
+          lastSeen: new Date().toLocaleTimeString("vi-VN"),
+          isEggLost: isEggLost,
+          lostEggCount: isEggLost ? (initialEggCount - currentEggCount) : 0
+        };
+        if (aiSuccess) {
+          telemetryUpdate.eggCount = currentEggCount;
+        }
+
+        await adminRtdb.ref(`incubators/${deviceId}/telemetry`).update(telemetryUpdate);
 
         // Mark camera as online and save previewImage + confidence
         await adminRtdb.ref(`incubators/${deviceId}/camera`).update({
           status: "online",
           lastCaptureAt: new Date().toLocaleTimeString("vi-VN"),
           previewImage: aiImageUrl,
-          confidence: aiResult.confidence
+          confidence: aiSuccess ? aiResult.confidence : 0
         });
       } catch (rtdbErr: any) {
         console.warn("Firebase RTDB update failed:", rtdbErr.message || rtdbErr);
       }
 
-      // 8. Send Push Notification FCM if egg count changed
-      if (countChanged) {
+      // 8. Send Push Notification FCM if egg count changed or egg is lost
+      if (isEggLost) {
+        const lostCount = initialEggCount - currentEggCount;
+        console.log(`CẢNH BÁO MẤT TRỨNG! Ban đầu: ${initialEggCount}, Hiện tại: ${currentEggCount} (Mất ${lostCount} quả).`);
+        try {
+          const message = {
+            topic: `incubator_${deviceId}`,
+            notification: {
+              title: "CẢNH BÁO MẤT TRỨNG!",
+              body: `Phát hiện mất trứng trong buồng ấp! Ban đầu: ${initialEggCount} quả, Hiện tại: ${currentEggCount} quả (Mất ${lostCount} quả trứng). Vui lòng kiểm tra khay ấp ngay!`
+            },
+            data: {
+              deviceId: deviceId,
+              initialEggCount: `${initialEggCount}`,
+              currentEggCount: `${currentEggCount}`,
+              lostCount: `${lostCount}`
+            }
+          };
+          await adminMessaging.send(message);
+          console.log("FCM CẢNH BÁO MẤT TRỨNG notification sent successfully.");
+        } catch (fcmErr: any) {
+          console.error("Failed to send FCM notification:", fcmErr.message || fcmErr);
+        }
+      } else if (countChanged) {
         console.log(`Egg count changed from ${previousEggCount} to ${currentEggCount}. Sending FCM Notification.`);
         try {
           const message = {
             topic: `incubator_${deviceId}`,
             notification: {
-              title: "Cảnh báo HatchMate AI",
+              title: "Cập nhật số lượng trứng",
               body: `Số lượng trứng thay đổi! Hiện tại: ${currentEggCount} quả (Trước đó: ${previousEggCount} quả).`
             },
             data: {
@@ -167,7 +216,8 @@ export async function POST(request: Request) {
       eggCount: aiResult.detectedCount,
       confidence: aiResult.confidence,
       rawImageUrl,
-      aiImageUrl
+      aiImageUrl: aiImageUrl || rawImageUrl,
+      aiAnalysisFailed: !aiSuccess
     });
 
   } catch (error) {

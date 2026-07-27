@@ -24,6 +24,9 @@ export interface CameraItem {
   streamEnabled: boolean;
   eggCount?: number;
   previousEggCount?: number;
+  initialEggCount?: number;
+  isEggLost?: boolean;
+  lostEggCount?: number;
   lastCountChangedAt?: string;
   ipAddress?: string;
   streamUrl?: string;

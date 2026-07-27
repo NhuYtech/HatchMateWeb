@@ -50,9 +50,14 @@ export default function CameraPage() {
               const lastSeen = item.lastSeen ?? "Vừa xong";
               const deviceName = item.name ?? key;
 
-              const eggCount = item.telemetry?.eggCount !== undefined ? Number(item.telemetry.eggCount) : 24;
-              const previousEggCount = status === "warning" ? 24 : eggCount;
-              const hasVariation = eggCount !== previousEggCount;
+              const initialEggCount = item.cycle?.initialEggCount !== undefined
+                ? Number(item.cycle.initialEggCount)
+                : (item.telemetry?.initialEggCount !== undefined ? Number(item.telemetry.initialEggCount) : 24);
+
+              const eggCount = item.telemetry?.eggCount !== undefined ? Number(item.telemetry.eggCount) : initialEggCount;
+              const isEggLost = item.telemetry?.isEggLost === true || (eggCount < initialEggCount && initialEggCount > 0);
+              const lostEggCount = isEggLost ? (initialEggCount - eggCount) : 0;
+
               activeCameras.push({
                 id: `cam-${key}`,
                 deviceId: key,
@@ -62,15 +67,18 @@ export default function CameraPage() {
                 status: status === "offline" ? "offline" : "online",
                 previewImage: item.camera?.previewImage ?? null,
                 lastCaptureAt: lastSeen,
-                aiStatus: hasVariation ? "alert" : "analyzed",
-                aiAlertCount: hasVariation ? 1 : 0,
-                lastAiSummary: hasVariation 
-                  ? `Cảnh báo: Số lượng trứng thay đổi (Ban đầu: ${previousEggCount}, Hiện tại: ${eggCount})` 
-                  : `Số lượng trứng ổn định: ${eggCount} quả`,
+                aiStatus: isEggLost ? "alert" : "analyzed",
+                aiAlertCount: isEggLost ? 1 : 0,
+                lastAiSummary: isEggLost 
+                  ? `🚨 CẢNH BÁO MẤT TRỨNG: Ban đầu ${initialEggCount} quả, hiện còn ${eggCount} quả (Mất ${lostEggCount} quả)` 
+                  : `Số lượng trứng ổn định: ${eggCount}/${initialEggCount} quả`,
                 lastAiConfidence: item.camera?.confidence !== undefined ? Math.round(Number(item.camera.confidence) * 100) : 98,
                 streamEnabled: false,
                 eggCount,
-                previousEggCount,
+                previousEggCount: initialEggCount,
+                initialEggCount,
+                isEggLost,
+                lostEggCount,
               });
 
               activeAiRecords.push({
@@ -80,13 +88,13 @@ export default function CameraPage() {
                 deviceName: deviceName,
                 capturedAt: lastSeen,
                 imageUrl: item.camera?.previewImage ?? null,
-                resultStatus: hasVariation ? "warning" : "normal",
-                resultTitle: hasVariation ? "Số lượng thay đổi" : "Số lượng ổn định",
-                resultSummary: hasVariation 
-                  ? `Phát hiện số trứng thay đổi từ ${previousEggCount} xuống ${eggCount} quả` 
-                  : `AI nhận diện thành công: ${eggCount} quả trứng, không có thay đổi`,
+                resultStatus: isEggLost ? "danger" : "normal",
+                resultTitle: isEggLost ? "CẢNH BÁO MẤT TRỨNG" : "Số lượng ổn định",
+                resultSummary: isEggLost 
+                  ? `Phát hiện sụt giảm trứng từ ${initialEggCount} xuống ${eggCount} quả (Mất ${lostEggCount} quả)` 
+                  : `AI nhận diện thành công: ${eggCount} quả trứng, giữ nguyên mốc ban đầu ${initialEggCount} quả`,
                 confidence: item.camera?.confidence !== undefined ? Math.round(Number(item.camera.confidence) * 100) : 98,
-                processedBy: "HatchMate AI v1.0",
+                processedBy: "HatchMate YOLOv8 AI",
                 notes: null,
               });
             }
