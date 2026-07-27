@@ -7,7 +7,6 @@ import CameraGrid from "@/src/components/camera/CameraGrid";
 import CameraTable from "@/src/components/camera/CameraTable";
 import AIAnalysisTable from "@/src/components/camera/AIAnalysisTable";
 import AppPhotoGalleryTable from "@/src/components/camera/AppPhotoGalleryTable";
-import CameraDetailModal from "@/src/components/camera/CameraDetailModal";
 
 import { ref, onValue } from "firebase/database";
 import { rtdb } from "@/src/lib/firebase";
@@ -289,16 +288,6 @@ export default function CameraPage() {
 
       {/* 5. Lịch sử ảnh đã được chụp sẽ được đưa từ app về web */}
       {!loading && <AppPhotoGalleryTable photos={photoRecords} />}
-
-      {/* Camera Detail Modal */}
-      {selectedCamera && (
-        <CameraDetailModal
-          isOpen={selectedCamera !== null}
-          onClose={() => setSelectedCamera(null)}
-          deviceId={selectedCamera.deviceId}
-          initialCamera={selectedCamera}
-        />
-      )}
     </div>
   );
 }

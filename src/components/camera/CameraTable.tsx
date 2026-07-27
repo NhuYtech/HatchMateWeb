@@ -54,7 +54,6 @@ export default function CameraTable({ cameras, onSelectCamera, onCaptureNew }: C
               <th className="px-5 py-3">Thông tin Máy ấp</th>
               <th className="px-5 py-3">Thông tin Camera</th>
               <th className="px-5 py-3">Trạng thái</th>
-              <th className="px-5 py-3 text-center">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -96,19 +95,6 @@ export default function CameraTable({ cameras, onSelectCamera, onCaptureNew }: C
                       Ngoại tuyến
                     </span>
                   )}
-                </td>
-
-                {/* Thao tác */}
-                <td className="px-5 py-3 text-center">
-                  <button
-                    type="button"
-                    onClick={() => onSelectCamera && onSelectCamera(camera)}
-                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-sky-100 bg-sky-50 px-3 text-xs font-bold text-sky-700 shadow-sm transition hover:bg-sky-100 active:scale-95 duration-100 cursor-pointer"
-                    title="Xem chi tiết Camera"
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    <span>Xem chi tiết</span>
-                  </button>
                 </td>
               </tr>
             ))}
