@@ -71,9 +71,6 @@ export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTablePro
           <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
             Lịch sử ảnh chụp từ App & Web ({photos.length} ảnh)
           </h3>
-          <p className="text-xs text-slate-500">
-            Tất cả hình ảnh được chụp thủ công hoặc tự động từ App di động đã đồng bộ về hệ thống
-          </p>
         </div>
       </div>
 
