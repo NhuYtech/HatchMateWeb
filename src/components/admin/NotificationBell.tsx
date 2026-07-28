@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, WifiOff, AlertTriangle, X, CheckCheck, PlusCircle, UserPlus } from "lucide-react";
 import { ref, onValue } from "firebase/database";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -65,10 +66,31 @@ const TYPE_CONFIG: Record<NotifType, { icon: React.ReactNode; bg: string; badge:
 };
 
 export default function NotificationBell() {
+  const router = useRouter();
   const [notifs, setNotifs] = useState<NotifItem[]>([]);
   const [open, setOpen] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const handleNotifClick = (notif: NotifItem) => {
+    // 1. Mark as read
+    setReadIds((prev) => new Set([...prev, notif.id]));
+
+    // 2. Remove notification from list
+    setNotifs((prev) => prev.filter((n) => n.id !== notif.id));
+
+    // 3. Close panel if empty
+    if (notifs.length <= 1) {
+      setOpen(false);
+    }
+
+    // 4. Navigate based on notification type
+    if (notif.type === "new_user") {
+      router.push("/users");
+    } else if (notif.type === "warning" || notif.type === "offline" || notif.type === "new_device") {
+      router.push("/devices");
+    }
+  };
 
   // ── 1. Device alerts + new device detection ──
   useEffect(() => {
@@ -306,7 +328,10 @@ export default function NotificationBell() {
                 return (
                   <div
                     key={notif.id}
-                    className={`flex items-start gap-3 px-4 py-3 transition-colors ${isUnread ? "bg-orange-50/30" : "bg-white"} hover:bg-slate-50`}
+                    onClick={() => handleNotifClick(notif)}
+                    className={`group relative flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors ${
+                      isUnread ? "bg-orange-50/30" : "bg-white"
+                    } hover:bg-sky-50/50`}
                   >
                     {/* Icon */}
                     <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${cfg.bg}`}>
@@ -323,10 +348,23 @@ export default function NotificationBell() {
                       <p className="text-[10px] text-slate-400 font-medium mt-1">{formatTime(notif.timestamp)}</p>
                     </div>
 
-                    {/* Badge */}
-                    <span className={`shrink-0 mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap ${cfg.badge}`}>
-                      {cfg.label}
-                    </span>
+                    {/* Badge & Delete Button */}
+                    <div className="flex flex-col items-end gap-1 shrink-0 mt-0.5">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap ${cfg.badge}`}>
+                        {cfg.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNotifClick(notif);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-slate-400 hover:text-rose-500 rounded"
+                        title="Đã đọc & xóa thông báo"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 );
               })

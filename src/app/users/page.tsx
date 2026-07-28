@@ -51,7 +51,9 @@ export default function UsersPage() {
         guest: 1,
       };
 
-      const mappedUsers: UserItem[] = Array.from(usersByEmail.entries()).map(([emailKey, docs]) => {
+      const mappedUsers: UserItem[] = Array.from(usersByEmail.entries())
+        .filter(([emailKey]) => emailKey.toLowerCase().trim() !== "hnyhttt2211015@student.ctuet.edu.vn")
+        .map(([emailKey, docs]) => {
         // Pick primary doc (the one with highest role or newest)
         const primaryDoc = docs.reduce((prev, curr) => {
           const prevRank = roleHierarchy[prev.role] || 0;
@@ -59,13 +61,16 @@ export default function UsersPage() {
           return currRank > prevRank ? curr : prev;
         }, docs[0]);
 
-        // Determine combined highest role
-        let highestRole = primaryDoc.role || "guest";
-        docs.forEach((d) => {
-          if ((roleHierarchy[d.role] || 0) > (roleHierarchy[highestRole] || 0)) {
-            highestRole = d.role;
-          }
-        });
+        // Determine role based on strict email specification
+        const lowerEmail = (primaryDoc.email || emailKey).toLowerCase().trim();
+        let highestRole = "guest";
+        if (lowerEmail === "hnyhttt2211015@student.ctuet.edu.vn") {
+          highestRole = "admin";
+        } else if (lowerEmail === "huynhnhuy.tech@gmail.com") {
+          highestRole = "owner";
+        } else {
+          highestRole = "guest";
+        }
 
         // Find all incubators matching any of this user's deviceCodes or deviceNames
         const userIncubators: any[] = [];
@@ -203,7 +208,7 @@ export default function UsersPage() {
       <UserPageHeader totalUsers={totalUsers} onAddUser={() => setIsAddModalOpen(true)} />
 
       {/* Mini Stats Cards */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-3">
         <UserMiniStatCard
           label="Tổng người dùng"
           value={totalUsers}
@@ -217,13 +222,7 @@ export default function UsersPage() {
           accent="emerald"
         />
         <UserMiniStatCard
-          label="Chủ máy"
-          value={adminUsers}
-          icon={ShieldCheck}
-          accent="sky"
-        />
-        <UserMiniStatCard
-          label="Máy ngoại tuyến"
+          label="Ngoại tuyến"
           value={disabledUsers}
           icon={UserMinus}
           accent="rose"

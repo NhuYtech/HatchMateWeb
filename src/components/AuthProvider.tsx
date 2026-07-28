@@ -13,9 +13,13 @@ export interface AuthUser {
   photoURL: string | null;
 }
 
+export const ADMIN_EMAIL = "hnyhttt2211015@student.ctuet.edu.vn";
+export const OWNER_EMAIL = "huynhnhuy.tech@gmail.com";
+
 interface AuthContextType {
   currentUser: AuthUser | null;
   loading: boolean;
+  authError: string | null;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfile: (displayName: string, photoURL: string | null) => Promise<void>;
@@ -26,11 +30,29 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isFirebaseConfigured) {
       const unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (user) {
+          const userEmail = user.email?.toLowerCase().trim();
+
+          // Enforce: ONLY hnyhttt2211015@student.ctuet.edu.vn can log into HatchMateWeb
+          if (userEmail !== ADMIN_EMAIL.toLowerCase()) {
+            console.warn(`[Auth] Access denied for ${userEmail}. Only ${ADMIN_EMAIL} is permitted on Web.`);
+            try {
+              await firebaseLogout();
+            } catch (e) {
+              console.error("Firebase logout error:", e);
+            }
+            setCurrentUser(null);
+            setAuthError("Rất tiếc, chỉ tài khoản Quản trị viên (hnyhttt2211015@student.ctuet.edu.vn) mới có quyền đăng nhập vào hệ thống Web!");
+            setLoading(false);
+            return;
+          }
+
+          setAuthError(null);
           setCurrentUser({
             uid: user.uid,
             email: user.email,
@@ -139,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, loading, signInWithGoogle, logout, updateUserProfile }}>
+    <AuthContext.Provider value={{ currentUser, loading, authError, signInWithGoogle, logout, updateUserProfile }}>
       {children}
     </AuthContext.Provider>
   );

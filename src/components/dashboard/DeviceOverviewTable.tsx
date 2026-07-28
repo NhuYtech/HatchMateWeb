@@ -7,6 +7,11 @@ interface DeviceOverviewTableProps {
 }
 
 export default function DeviceOverviewTable({ devices }: DeviceOverviewTableProps) {
+  const filteredDevices = devices.filter((device) => {
+    const id = device.id.trim().toLowerCase();
+    return id !== "matg02" && id !== "mayap01" && id !== "mayap02";
+  });
+
   return (
     <section className="rounded-[24px] border border-slate-200/80 bg-white/95 p-4 sm:p-6 shadow-sm transition-all duration-300 hover:shadow-md min-w-0 overflow-hidden">
       <div className="mb-6">
@@ -31,7 +36,7 @@ export default function DeviceOverviewTable({ devices }: DeviceOverviewTableProp
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100/80">
-            {devices.map((device, index) => {
+            {filteredDevices.map((device, index) => {
               // Status Badge configuration
               let statusBadge = null;
               if (device.status === "online") {

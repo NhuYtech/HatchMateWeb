@@ -8,10 +8,12 @@ import AnimatedBackground from "@/src/components/common/AnimatedBackground";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, authError } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const displayError = authError || errorMsg;
 
   useEffect(() => {
     setMounted(true);
@@ -160,9 +162,9 @@ export default function LoginPage() {
         )}
 
         {/* Error / Warning Alert */}
-        {errorMsg && (
+        {displayError && (
           <div className="w-full mb-6 p-3 rounded-2xl bg-orange-50 border border-orange-200/50 text-orange-700 text-xs font-semibold text-center select-none transition-all duration-300">
-            {errorMsg}
+            {displayError}
           </div>
         )}
 

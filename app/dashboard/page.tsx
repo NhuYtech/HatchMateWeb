@@ -84,6 +84,14 @@ export default function DashboardPage() {
   useEffect(() => {
     const devicesRef = ref(rtdb, "incubators");
 
+    // Clean up old RTDB mock nodes MATG02, MayAp01, MayAp02 if present in Realtime DB
+    try {
+      const { remove } = require("firebase/database");
+      ["MATG02", "MayAp01", "MayAp02"].forEach((mockKey) => {
+        remove(ref(rtdb, `incubators/${mockKey}`)).catch(() => {});
+      });
+    } catch (_) {}
+
     // 2. Listen to real-time updates from "incubators" node (no mock seeding)
     const unsubscribe = onValue(devicesRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -91,6 +99,12 @@ export default function DashboardPage() {
         const list: DeviceItem[] = [];
 
         Object.keys(data).forEach((key) => {
+          // Filter out old testing mock devices MATG02, MayAp01, MayAp02
+          const lowerKey = key.trim().toLowerCase();
+          if (lowerKey === "matg02" || lowerKey === "mayap01" || lowerKey === "mayap02") {
+            return;
+          }
+
           const item = data[key];
           if (typeof item === "object" && item !== null) {
             // Robust mapping to read temperature, humidity, incubating days, remaining days

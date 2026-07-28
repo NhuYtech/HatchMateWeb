@@ -127,15 +127,7 @@ export default function AddDeviceModal({ isOpen, onClose, onSuccess }: AddDevice
       newErrors.pinCode = "Mã PIN phải chứa đúng 6 chữ số";
     }
 
-    // 4. Custom Days Validation
-    if (eggType === "custom") {
-      const days = parseInt(customDays);
-      if (isNaN(days) || days <= 0 || days > 100) {
-        newErrors.customDays = "Số ngày ấp phải từ 1 đến 100 ngày";
-      }
-    }
-
-    // 5. Owner Validation
+    // 4. Owner Validation
     const emailTrimmed = selectedUserEmail.trim();
     if (emailTrimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
       newErrors.owner = "Địa chỉ email không đúng định dạng";
@@ -155,11 +147,7 @@ export default function AddDeviceModal({ isOpen, onClose, onSuccess }: AddDevice
       return;
     }
 
-    // Calculate total days based on selection
-    let totalDays = 21;
-    if (eggType === "duck") totalDays = 28;
-    else if (eggType === "pigeon") totalDays = 18;
-    else if (eggType === "custom") totalDays = parseInt(customDays);
+    const totalDays = 21; // Mặc định chu kỳ ấp trứng gà (21 ngày)
 
     const selectedUser = users.find((u) => u.email === selectedUserEmail);
     const ownerUid = selectedUser ? selectedUser.uid : "";
@@ -383,66 +371,6 @@ export default function AddDeviceModal({ isOpen, onClose, onSuccess }: AddDevice
               </p>
             )}
           </div>
-
-          {/* Egg Type Select */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block pl-1">
-              Loại trứng & Chu kỳ ấp
-            </label>
-            <div className="relative flex items-center">
-              <Calendar className="absolute left-3.5 h-4 w-4 text-slate-400 z-10" />
-              <select
-                disabled={loading}
-                value={eggType}
-                onChange={(e) => {
-                  setEggType(e.target.value);
-                  if (errors.customDays) setErrors((prev) => ({ ...prev, customDays: "" }));
-                }}
-                className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-[16px] text-sm text-slate-800 focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-100 focus:outline-none transition-all duration-200 appearance-none cursor-pointer"
-              >
-                <option value="chicken">Trứng Gà (21 ngày)</option>
-                <option value="duck">Trứng Vịt (28 ngày)</option>
-                <option value="pigeon">Trứng Bồ Câu (18 ngày)</option>
-                <option value="custom">Tùy chỉnh số ngày...</option>
-              </select>
-              <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Custom Days Input (Conditional) */}
-          {eggType === "custom" && (
-            <div className="space-y-1.5 pl-1 animate-fadeIn">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block pl-1">
-                Số ngày ấp tùy chỉnh <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                disabled={loading}
-                value={customDays}
-                onChange={(e) => {
-                  setCustomDays(e.target.value);
-                  if (errors.customDays) setErrors((prev) => ({ ...prev, customDays: "" }));
-                }}
-                placeholder="Nhập số ngày ấp (1 - 100)"
-                className={`w-full px-4 py-3 bg-white border rounded-[16px] text-sm text-slate-800 focus:bg-white focus:ring-4 focus:outline-none transition-all duration-200 ${errors.customDays
-                  ? "border-rose-300 focus:border-rose-500 focus:ring-rose-100"
-                  : "border-slate-200 focus:border-amber-500 focus:ring-amber-100"
-                  }`}
-              />
-              {errors.customDays && (
-                <p className="text-xs text-rose-600 font-semibold pl-1 flex items-center gap-1">
-                  <span className="inline-block h-1 w-1 rounded-full bg-rose-500" />
-                  {errors.customDays}
-                </p>
-              )}
-            </div>
-          )}
 
           {/* Form Actions */}
           <div className="flex gap-3 pt-4 border-t border-slate-100 mt-6">
