@@ -68,16 +68,34 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
   // Export CSV Report Functionality
   const handleExportCsv = () => {
     if (records.length === 0) return;
-    const headers = ["Thời gian", "Tên máy ấp", "Mã thiết bị", "Trạng thái AI", "Độ tin cậy (%)", "Chi tiết chẩn đoán", "Ghi chú"];
-    const rows = records.map((r) => [
-      `"${formatReadableDateTime(r.capturedAt)}"`,
-      `"${r.deviceName}"`,
-      `"${r.deviceId}"`,
-      `"${r.resultTitle}"`,
-      `"${r.confidence}%"`,
-      `"${r.resultSummary.replace(/"/g, '""')}"`,
-      `"${r.notes || 'Không có'}"`
-    ]);
+    const headers = ["Máy ấp / Camera", "Mã thiết bị", "Thời gian chụp", "Kết quả AI", "Độ tin cậy (%)", "Chi tiết chẩn đoán"];
+    const rows = records.map((r) => {
+      const displayDeviceId = (r.deviceId === r.deviceName || r.deviceId.toLowerCase().includes("mayap"))
+        ? "MATG01"
+        : r.deviceId;
+      
+      const isManual = r.resultStatus === "manual" || 
+                       (r.resultTitle && (r.resultTitle.includes("THỦ CÔNG") || r.resultTitle.includes("NGƯỜI DÙNG")));
+      
+      let statusStr = "Bình thường";
+      if (isManual) statusStr = "Chưa quét";
+      else if (r.resultStatus === "warning") statusStr = "Cảnh báo";
+      else if (r.resultStatus === "danger") statusStr = "Nguy hiểm";
+
+      let summaryStr = r.resultSummary || "";
+      if (isManual) {
+        summaryStr = "Ảnh chụp từ ứng dụng/Web, chưa qua phân tích AI";
+      }
+
+      return [
+        `"HatchMate-Cam"`,
+        `"${displayDeviceId}"`,
+        `"${formatReadableDateTime(r.capturedAt)}"`,
+        `"${statusStr}"`,
+        `"${!isManual && r.confidence ? r.confidence + "%" : "Không có"}"`,
+        `"${(r.resultTitle + ' - ' + summaryStr).replace(/"/g, '""')}"`
+      ];
+    });
     const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(row => row.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -121,6 +139,37 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
 
   const paginatedRecords = records.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  const getDisplayDeviceId = (rec: AiRecord) => {
+    return (rec.deviceId === rec.deviceName || rec.deviceId.toLowerCase().includes("mayap"))
+      ? "MATG01"
+      : rec.deviceId;
+  };
+
+  // Pre-calculate rowSpans for consecutive records belonging to the same device
+  const rowSpans: number[] = [];
+  for (let i = 0; i < paginatedRecords.length; i++) {
+    const currentDevName = paginatedRecords[i].deviceName;
+    const currentDevId = getDisplayDeviceId(paginatedRecords[i]);
+
+    if (
+      i === 0 ||
+      paginatedRecords[i - 1].deviceName !== currentDevName ||
+      getDisplayDeviceId(paginatedRecords[i - 1]) !== currentDevId
+    ) {
+      let count = 1;
+      while (
+        i + count < paginatedRecords.length &&
+        paginatedRecords[i + count].deviceName === currentDevName &&
+        getDisplayDeviceId(paginatedRecords[i + count]) === currentDevId
+      ) {
+        count++;
+      }
+      rowSpans[i] = count;
+    } else {
+      rowSpans[i] = 0;
+    }
+  }
+
   return (
     <div className="rounded-[24px] border border-sky-100/80 bg-white shadow-sm shadow-sky-100/10 overflow-hidden">
       
@@ -151,13 +200,12 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
         <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-white text-xs font-semibold text-slate-700">
+              <th className="px-6 py-4 border-r border-slate-100 text-center">Máy ấp / Camera</th>
               <th className="px-6 py-4">Thời gian chụp</th>
               <th className="px-6 py-4">Ảnh quét</th>
-              <th className="px-6 py-4">Máy ấp / Camera</th>
               <th className="px-6 py-4">Kết quả AI</th>
               <th className="px-6 py-4">Độ tin cậy</th>
-              <th className="px-6 py-4 text-left uppercase tracking-wider">CHI TIẾT CHẨN ĐOÁN</th>
-              <th className="px-6 py-4">Ghi chú</th>
+              <th className="px-6 py-4 text-left font-semibold text-slate-700">Chi tiết chẩn đoán</th>
               <th className="px-6 py-4 text-center">Hành động</th>
             </tr>
           </thead>
@@ -176,6 +224,9 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                 }
               }
 
+              const rowSpan = rowSpans[index];
+              const displayDeviceId = getDisplayDeviceId(record);
+
               return (
                 <tr 
                   key={record.id} 
@@ -183,6 +234,20 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                     index % 2 === 0 ? "bg-white" : "bg-[#F5F7FA]"
                   } hover:bg-sky-50/30`}
                 >
+                  {/* Máy ấp / Camera - Rowspan Grouped Centered */}
+                  {rowSpan > 0 && (
+                    <td 
+                      rowSpan={rowSpan} 
+                      className="px-6 py-4 align-middle text-center bg-white border-r border-slate-100/80 shadow-[1px_0_0_0_rgba(241,245,249,1)]"
+                    >
+                      <div className="flex flex-col items-center justify-center">
+                        <p className="text-xs font-bold text-sky-600 hover:text-sky-700 transition-colors font-mono whitespace-nowrap cursor-pointer">
+                          HatchMate-Cam · {displayDeviceId}
+                        </p>
+                      </div>
+                    </td>
+                  )}
+
                   {/* Thời gian chụp */}
                   <td className="px-6 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap">
                     {formatReadableDateTime(record.capturedAt)}
@@ -203,18 +268,6 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                       ) : (
                         <ImageIcon className="h-5 w-5 text-slate-600" />
                       )}
-                    </div>
-                  </td>
-
-                  {/* Máy ấp / Camera */}
-                  <td className="px-6 py-4">
-                    <div>
-                      <div className="font-semibold text-sky-600 hover:text-sky-700 transition-colors cursor-pointer">
-                        {record.deviceName}
-                      </div>
-                      <p className="text-[10px] text-slate-400 font-semibold font-mono mt-0.5">
-                        HatchMate-Cam · {record.deviceId}
-                      </p>
                     </div>
                   </td>
 
@@ -247,11 +300,6 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                       </p>
                     </div>
                   </td>
-
-                {/* Ghi chú */}
-                <td className="px-6 py-4 text-xs font-semibold text-slate-400">
-                  {record.notes || <span className="italic text-slate-300">Không có</span>}
-                </td>
 
                 {/* Hành động */}
                 <td className="px-6 py-4 text-center">

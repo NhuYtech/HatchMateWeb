@@ -26,7 +26,7 @@ const menus: MenuItem[] = [
   { label: "Người dùng", icon: Users, href: "/users" },
   { label: "Camera", icon: Camera, href: "/camera" },
   // { label: "Cảnh báo", icon: BellRing, href: "/alerts" },
-  { label: "Báo cáo & Nhật ký", icon: BarChart3, href: "/reports" },
+  { label: "Thống kê", icon: BarChart3, href: "/reports" },
 ];
 
 interface SidebarNavItemProps {
