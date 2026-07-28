@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   Eye, 
   Image as ImageIcon, 
@@ -88,7 +89,10 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
     document.body.removeChild(link);
   };
 
-  const getStatusText = (status: AiRecord["resultStatus"]) => {
+  const getStatusText = (status: AiRecord["resultStatus"], title?: string) => {
+    if (status === "manual" || (title && (title.includes("THỦ CÔNG") || title.includes("NGƯỜI DÙNG")))) {
+      return <span className="font-semibold text-slate-400 text-xs italic">Chưa quét</span>;
+    }
     switch (status) {
       case "normal":
         return <span className="font-semibold text-emerald-700 text-xs">Bình thường</span>;
@@ -96,6 +100,8 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
         return <span className="font-semibold text-amber-700 text-xs">Cảnh báo</span>;
       case "danger":
         return <span className="font-semibold text-rose-700 text-xs animate-pulse">Nguy hiểm</span>;
+      default:
+        return <span className="font-semibold text-slate-400 text-xs italic">Chưa quét</span>;
     }
   };
 
@@ -147,80 +153,100 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
             <tr className="border-b border-slate-200 bg-white text-xs font-semibold text-slate-700">
               <th className="px-6 py-4">Thời gian chụp</th>
               <th className="px-6 py-4">Ảnh quét</th>
-              <th className="px-6 py-4">Thiết bị / Camera</th>
+              <th className="px-6 py-4">Máy ấp / Camera</th>
               <th className="px-6 py-4">Kết quả AI</th>
-              <th className="px-6 py-4">Confidence</th>
-              <th className="px-6 py-4 text-center uppercase tracking-wider">CHI TIẾT CHẨN ĐOÁN</th>
+              <th className="px-6 py-4">Độ tin cậy</th>
+              <th className="px-6 py-4 text-left uppercase tracking-wider">CHI TIẾT CHẨN ĐOÁN</th>
               <th className="px-6 py-4">Ghi chú</th>
               <th className="px-6 py-4 text-center">Hành động</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {paginatedRecords.map((record, index) => (
-              <tr 
-                key={record.id} 
-                className={`group transition-colors duration-150 ${
-                  index % 2 === 0 ? "bg-white" : "bg-[#F5F7FA]"
-                } hover:bg-sky-50/30`}
-              >
-                {/* Thời gian chụp */}
-                <td className="px-6 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap">
-                  {formatReadableDateTime(record.capturedAt)}
-                </td>
+            {paginatedRecords.map((record, index) => {
+              const isManual = record.resultStatus === "manual" || 
+                               (record.resultTitle && (record.resultTitle.includes("THỦ CÔNG") || record.resultTitle.includes("NGƯỜI DÙNG")));
+              
+              let displaySummary = record.resultSummary;
+              if (isManual) {
+                displaySummary = "Ảnh chụp từ ứng dụng/Web, chưa qua phân tích AI";
+              } else {
+                const titleMatch = record.resultTitle?.match(/(\d+)\s*quả/i);
+                if (titleMatch && displaySummary && displaySummary.includes("24 quả") && titleMatch[1] !== "24") {
+                  displaySummary = displaySummary.replace(/24\s*quả/g, `${titleMatch[1]} quả`);
+                }
+              }
 
-                {/* Ảnh quét */}
-                <td className="px-6 py-4">
-                  <div 
-                    onClick={() => setPreviewRecord(record)}
-                    className="relative h-12 w-16 shrink-0 rounded-lg bg-slate-900 border border-slate-200 overflow-hidden flex items-center justify-center cursor-pointer hover:shadow-md transition"
-                  >
-                    {record.imageUrl ? (
-                      <img 
-                        src={record.imageUrl} 
-                        alt={record.resultTitle} 
-                        className="h-full w-full object-cover group-hover:scale-105 transition duration-200"
-                      />
-                    ) : (
-                      <ImageIcon className="h-5 w-5 text-slate-600" />
-                    )}
-                  </div>
-                </td>
+              return (
+                <tr 
+                  key={record.id} 
+                  className={`group transition-colors duration-150 ${
+                    index % 2 === 0 ? "bg-white" : "bg-[#F5F7FA]"
+                  } hover:bg-sky-50/30`}
+                >
+                  {/* Thời gian chụp */}
+                  <td className="px-6 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap">
+                    {formatReadableDateTime(record.capturedAt)}
+                  </td>
 
-                {/* Thiết bị / Camera */}
-                <td className="px-6 py-4">
-                  <div>
-                    <div className="font-semibold text-sky-600 hover:text-sky-700 transition-colors cursor-pointer">
-                      {record.deviceName}
+                  {/* Ảnh quét */}
+                  <td className="px-6 py-4">
+                    <div 
+                      onClick={() => setPreviewRecord(record)}
+                      className="relative h-12 w-16 shrink-0 rounded-lg bg-slate-900 border border-slate-200 overflow-hidden flex items-center justify-center cursor-pointer hover:shadow-md transition"
+                    >
+                      {record.imageUrl ? (
+                        <img 
+                          src={record.imageUrl} 
+                          alt={record.resultTitle} 
+                          className="h-full w-full object-cover group-hover:scale-105 transition duration-200"
+                        />
+                      ) : (
+                        <ImageIcon className="h-5 w-5 text-slate-600" />
+                      )}
                     </div>
-                    <p className="text-[10px] text-slate-400 font-semibold font-mono mt-0.5">
-                      HatchMate-Cam · {record.deviceId}
-                    </p>
-                  </div>
-                </td>
+                  </td>
 
-                {/* Kết quả AI */}
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {getStatusText(record.resultStatus)}
-                </td>
+                  {/* Máy ấp / Camera */}
+                  <td className="px-6 py-4">
+                    <div>
+                      <div className="font-semibold text-sky-600 hover:text-sky-700 transition-colors cursor-pointer">
+                        {record.deviceName}
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-semibold font-mono mt-0.5">
+                        HatchMate-Cam · {record.deviceId}
+                      </p>
+                    </div>
+                  </td>
 
-                {/* Confidence */}
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="font-semibold text-slate-800 text-xs">
-                    {record.confidence}%
-                  </span>
-                </td>
+                  {/* Kết quả AI */}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getStatusText(record.resultStatus, record.resultTitle)}
+                  </td>
 
-                {/* Chi tiết chuẩn đoán - In hoa & Căn giữa */}
-                <td className="px-6 py-4 text-center">
-                  <div className="mx-auto max-w-[280px] text-center">
-                    <p className="font-extrabold text-sky-950 text-xs mb-0.5 uppercase tracking-wide">
-                      {record.resultTitle}
-                    </p>
-                    <p className="text-[11px] font-semibold text-slate-500 line-clamp-2 leading-relaxed">
-                      {record.resultSummary}
-                    </p>
-                  </div>
-                </td>
+                  {/* Độ tin cậy */}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {!isManual && record.confidence !== undefined && record.confidence !== null && record.confidence > 0 ? (
+                      <span className="font-semibold text-slate-800 text-xs">
+                        {record.confidence}%
+                      </span>
+                    ) : (
+                      <span className="font-medium text-slate-400 text-xs italic">
+                        Không có
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Chi tiết chẩn đoán - Căn trái */}
+                  <td className="px-6 py-4 text-left">
+                    <div className="max-w-[320px] text-left">
+                      <p className="font-extrabold text-sky-950 text-xs mb-0.5 uppercase tracking-wide">
+                        {record.resultTitle}
+                      </p>
+                      <p className="text-[11px] font-semibold text-slate-500 line-clamp-2 leading-relaxed">
+                        {displaySummary}
+                      </p>
+                    </div>
+                  </td>
 
                 {/* Ghi chú */}
                 <td className="px-6 py-4 text-xs font-semibold text-slate-400">
@@ -273,8 +299,9 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                   </div>
                 </td>
               </tr>
-            ))}
-          </tbody>
+            );
+          })}
+        </tbody>
         </table>
       </div>
 
@@ -292,7 +319,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
       />
 
       {/* Modal 1: Xem chi tiết kết quả phân tích AI - Căn giữa tiêu đề, ảnh vừa vặn không bị bóp đen */}
-      {previewRecord && (
+      {previewRecord && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative max-w-2xl w-full rounded-[28px] bg-white p-6 shadow-2xl border border-sky-100 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
             <div className="relative border-b border-slate-100 pb-3 text-center">
@@ -338,11 +365,12 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal 2: Xem ảnh gốc phóng to - Đẹp mắt, không bị viền lồng viền */}
-      {previewOriginalUrl && (
+      {previewOriginalUrl && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative max-w-3xl w-full rounded-[28px] bg-white p-6 shadow-2xl border border-sky-100 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
             <div className="relative border-b border-slate-100 pb-3 text-center">
@@ -365,7 +393,8 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

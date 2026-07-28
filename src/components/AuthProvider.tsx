@@ -2,8 +2,9 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, updateProfile } from "firebase/auth";
-import { auth, isFirebaseConfigured } from "@/src/lib/firebase";
+import { auth, db, isFirebaseConfigured } from "@/src/lib/firebase";
 import { signInWithGoogle as firebaseSignInWithGoogle, logout as firebaseLogout } from "@/src/lib/auth";
+import { collection, query, where, getDocs, setDoc, doc } from "firebase/firestore";
 
 export interface AuthUser {
   uid: string;
@@ -27,9 +28,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // If Firebase is configured, subscribe to auth state changes
     if (isFirebaseConfigured) {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (user) {
           setCurrentUser({
             uid: user.uid,
@@ -37,6 +37,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             displayName: user.displayName,
             photoURL: user.photoURL,
           });
+
+          // Sync online status and last active timestamp to Firestore
+          try {
+            const userEmail = user.email?.toLowerCase().trim();
+            if (userEmail) {
+              const usersCol = collection(db, "users");
+              const q = query(usersCol, where("email", "==", userEmail));
+              const snap = await getDocs(q);
+
+              const nowIso = new Date().toISOString();
+              if (!snap.empty) {
+                await Promise.all(
+                  snap.docs.map((docSnap) =>
+                    setDoc(doc(db, "users", docSnap.id), {
+                      isOnline: true,
+                      lastActiveAt: nowIso,
+                      fullName: user.displayName || docSnap.data().fullName,
+                      profilePicture: user.photoURL || docSnap.data().profilePicture,
+                    }, { merge: true })
+                  )
+                );
+              } else {
+                await setDoc(doc(db, "users", user.uid), {
+                  uid: user.uid,
+                  email: userEmail,
+                  fullName: user.displayName || "Người dùng",
+                  role: "admin",
+                  status: "active",
+                  isOnline: true,
+                  lastActiveAt: nowIso,
+                  createdAt: nowIso,
+                  profilePicture: user.photoURL || "",
+                }, { merge: true });
+              }
+            }
+          } catch (err) {
+            console.error("Error updating online presence in Firestore:", err);
+          }
         } else {
           setCurrentUser(null);
         }
@@ -57,6 +95,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    if (currentUser?.email) {
+      try {
+        const userEmail = currentUser.email.toLowerCase().trim();
+        const usersCol = collection(db, "users");
+        const q = query(usersCol, where("email", "==", userEmail));
+        const snap = await getDocs(q);
+        const nowIso = new Date().toISOString();
+
+        await Promise.all(
+          snap.docs.map((docSnap) =>
+            setDoc(doc(db, "users", docSnap.id), {
+              isOnline: false,
+              lastActiveAt: nowIso,
+            }, { merge: true })
+          )
+        );
+      } catch (err) {
+        console.error("Error updating offline presence on logout:", err);
+      }
+    }
+
     setCurrentUser(null);
     if (isFirebaseConfigured) {
       try {

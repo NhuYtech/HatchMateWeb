@@ -7,7 +7,7 @@ import DeviceFilterBar from "@/src/components/devices/DeviceFilterBar";
 import DeviceTable from "@/src/components/devices/DeviceTable";
 import AddDeviceModal from "@/src/components/devices/AddDeviceModal";
 import DeleteConfirmModal from "@/src/components/devices/DeleteConfirmModal";
-import { ref, onValue, get } from "firebase/database";
+import { ref, onValue, get, remove } from "firebase/database";
 import { collection, getDocs } from "firebase/firestore";
 import { auth, db, rtdb } from "@/src/lib/firebase";
 import {
@@ -22,6 +22,7 @@ export default function DevicesPage() {
   const [devices, setDevices] = useState<DeviceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [ownerEmail, setOwnerEmail] = useState<string>("Đang tải...");
+  const [usersMap, setUsersMap] = useState<Record<string, string>>({});
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteDeviceId, setDeleteDeviceId] = useState("");
@@ -43,11 +44,16 @@ export default function DevicesPage() {
           const usersCol = collection(db, "users");
           const querySnapshot = await getDocs(usersCol);
           let foundEmail = "";
+          const map: Record<string, string> = {};
 
           querySnapshot.forEach((doc) => {
             const userData = doc.data();
-            if (userData.role === "owner" && userData.email) {
-              foundEmail = userData.email;
+            if (userData.email) {
+              const fullName = userData.fullName || userData.name || "Người dùng ẩn danh";
+              map[userData.email.toLowerCase()] = fullName;
+              if (userData.role === "owner") {
+                foundEmail = userData.email;
+              }
             }
           });
 
@@ -60,6 +66,7 @@ export default function DevicesPage() {
             });
           }
 
+          setUsersMap(map);
           if (foundEmail) {
             setOwnerEmail(foundEmail);
           } else {
@@ -81,6 +88,12 @@ export default function DevicesPage() {
   const mapDataToDevices = (data: any): DeviceItem[] => {
     const list: DeviceItem[] = [];
     Object.keys(data).forEach((key) => {
+      // Filter out old testing mock devices MATG02, MayAp01, MayAp02
+      const lowerKey = key.trim().toLowerCase();
+      if (lowerKey === "matg02" || lowerKey === "mayap01" || lowerKey === "mayap02") {
+        return;
+      }
+
       const item = data[key];
       if (typeof item === "object" && item !== null) {
         const temperature = item.telemetry?.temp !== undefined
@@ -108,10 +121,13 @@ export default function DevicesPage() {
             ? "paused"
             : (totalIncubationDays - incubatingDay <= 3 ? "hatchingSoon" : "incubating");
 
+        const rawOwner = item.ownerEmail || ownerEmail;
+        const resolvedOwner = usersMap[rawOwner.toLowerCase()] || rawOwner;
+
         list.push({
           id: key,
           name: item.name ?? key,
-          owner: item.ownerEmail || ownerEmail,
+          owner: resolvedOwner,
           status: String(item.status ?? (item.alert === "NORMAL" ? "online" : (item.alert ? "warning" : "offline"))).toLowerCase() as any,
           incubationStatus,
           temperature,
@@ -135,6 +151,11 @@ export default function DevicesPage() {
   useEffect(() => {
     const devicesRef = ref(rtdb, "incubators");
 
+    // Clean up old RTDB mock nodes MATG02 and MayAp01 if present in Realtime DB
+    ["MATG02", "MayAp01", "MayAp02"].forEach((mockKey) => {
+      remove(ref(rtdb, `incubators/${mockKey}`)).catch(() => {});
+    });
+
     const unsubscribe = onValue(devicesRef, (snapshot) => {
       if (snapshot.exists()) {
         const list = mapDataToDevices(snapshot.val());
@@ -146,7 +167,7 @@ export default function DevicesPage() {
     });
 
     return () => unsubscribe();
-  }, [ownerEmail]);
+  }, [ownerEmail, usersMap]);
 
   // 3. Manual refresh function triggered by clicking RotateCw
   const handleRefresh = async () => {

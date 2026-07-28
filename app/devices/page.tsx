@@ -82,6 +82,12 @@ export default function DevicesPage() {
   const mapDataToDevices = (data: any): DeviceItem[] => {
     const list: DeviceItem[] = [];
     Object.keys(data).forEach((key) => {
+      // Filter out old testing mock devices MATG02, MayAp01, MayAp02
+      const lowerKey = key.trim().toLowerCase();
+      if (lowerKey === "matg02" || lowerKey === "mayap01" || lowerKey === "mayap02") {
+        return;
+      }
+
       const item = data[key];
       if (typeof item === "object" && item !== null) {
         const temperature = item.telemetry?.temp !== undefined
@@ -138,6 +144,14 @@ export default function DevicesPage() {
   // 2. Fetch Devices list from Realtime Database (real-time listener)
   useEffect(() => {
     const devicesRef = ref(rtdb, "incubators");
+
+    // Clean up old RTDB mock nodes MATG02 and MayAp01 if present in Realtime DB
+    try {
+      const { remove } = require("firebase/database");
+      ["MATG02", "MayAp01", "MayAp02"].forEach((mockKey) => {
+        remove(ref(rtdb, `incubators/${mockKey}`)).catch(() => {});
+      });
+    } catch (_) {}
 
     const unsubscribe = onValue(devicesRef, (snapshot) => {
       if (snapshot.exists()) {

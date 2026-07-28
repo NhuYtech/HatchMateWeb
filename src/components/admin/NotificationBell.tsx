@@ -90,6 +90,11 @@ export default function NotificationBell() {
       const newDeviceNotifs: NotifItem[] = [];
 
       Object.keys(data).forEach((key) => {
+        const lowerKey = key.trim().toLowerCase();
+        if (lowerKey === "matg02" || lowerKey === "mayap01" || lowerKey === "mayap02") {
+          return;
+        }
+
         const item = data[key];
         if (typeof item !== "object" || item === null) return;
 
@@ -148,7 +153,8 @@ export default function NotificationBell() {
         // Remove stale alert/offline/new_device notifs, keep user notifs
         const userNotifs = prev.filter((n) => n.type === "new_user");
         const prevNewDevices = prev.filter((n) => n.type === "new_device");
-        return [...updatedAlertNotifs, ...newDeviceNotifs, ...prevNewDevices, ...userNotifs];
+        const combined = [...newDeviceNotifs, ...updatedAlertNotifs, ...prevNewDevices, ...userNotifs];
+        return combined.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       });
     });
 
@@ -171,12 +177,21 @@ export default function NotificationBell() {
           if (initialized && !knownUserIds.has(doc.id)) {
             const data = doc.data();
             const name = data.fullName || data.displayName || data.email || "Người dùng mới";
+            
+            let userTime = new Date();
+            if (data.createdAt) {
+              const parsed = new Date(typeof data.createdAt === "string" ? data.createdAt : (data.createdAt.seconds ? data.createdAt.seconds * 1000 : data.createdAt));
+              if (!isNaN(parsed.getTime())) {
+                userTime = parsed;
+              }
+            }
+
             newUserNotifs.push({
-              id: `new-user-${doc.id}-${now.getTime()}`,
+              id: `new-user-${doc.id}-${userTime.getTime()}`,
               type: "new_user",
               title: "Người dùng mới",
               message: `"${name}" vừa được thêm vào hệ thống.`,
-              timestamp: now,
+              timestamp: userTime,
             });
           }
           knownUserIds.add(doc.id);
@@ -185,7 +200,10 @@ export default function NotificationBell() {
         initialized = true;
 
         if (newUserNotifs.length > 0) {
-          setNotifs((prev) => [...newUserNotifs, ...prev]);
+          setNotifs((prev) => {
+            const combined = [...newUserNotifs, ...prev];
+            return combined.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+          });
         }
       },
       (err) => {
@@ -208,8 +226,12 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  // Sort by timestamp descending
-  const sorted = [...notifs].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  // Sort by timestamp descending (newest first, with id tie-breaker)
+  const sorted = [...notifs].sort((a, b) => {
+    const diff = b.timestamp.getTime() - a.timestamp.getTime();
+    if (diff !== 0) return diff;
+    return b.id.localeCompare(a.id);
+  });
   const unreadCount = sorted.filter((n) => !readIds.has(n.id)).length;
 
   const markAllRead = () => setReadIds(new Set(sorted.map((n) => n.id)));

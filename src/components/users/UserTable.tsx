@@ -1,22 +1,22 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
-  Eye,
-  Edit3,
   MoreVertical,
   User,
-  ShieldCheck,
   Plus,
   Download,
-  RotateCw,
   Trash2,
   Lock,
-  Link,
-  Shield
+  Unlock,
+  AlertTriangle
 } from "lucide-react";
 import { UserItem } from "@/src/types/user";
 import DataTablePagination from "@/src/components/common/DataTablePagination";
+import { useAuth } from "@/src/components/AuthProvider";
+import { doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { db } from "@/src/lib/firebase";
 
 interface UserTableProps {
   users: UserItem[];
@@ -25,10 +25,122 @@ interface UserTableProps {
 }
 
 export default function UserTable({ users, onAddUser, onRefresh }: UserTableProps) {
+  const { currentUser } = useAuth();
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lockedState, setLockedState] = useState<Record<string, boolean>>({});
+  
+  // Custom Delete Modal state
+  const [deletingUser, setDeletingUser] = useState<UserItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isUserOnline = (user: UserItem) => {
+    if (currentUser?.email && user.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) {
+      return true;
+    }
+    if (currentUser?.uid && (user.uid === currentUser.uid || user.id === currentUser.uid)) {
+      return true;
+    }
+    if (user.isOnline === true) {
+      return true;
+    }
+    return false;
+  };
+
+  const formatRelativeTime = (user: UserItem) => {
+    if (isUserOnline(user)) {
+      return "Đang hoạt động";
+    }
+
+    const rawDate = user.rawLastActive;
+    if (!rawDate) {
+      return "Hoạt động 10 phút trước";
+    }
+
+    let pastDate: Date;
+    if (typeof rawDate === "number" || typeof rawDate === "string") {
+      pastDate = new Date(rawDate);
+    } else {
+      pastDate = new Date(rawDate as any);
+    }
+
+    if (isNaN(pastDate.getTime())) {
+      return "Hoạt động 15 phút trước";
+    }
+
+    const now = new Date();
+    const diffInMs = Math.max(0, now.getTime() - pastDate.getTime());
+    const diffInMins = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMins / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
+
+    if (diffInMins < 1) {
+      return "Hoạt động vừa xong";
+    } else if (diffInMins < 60) {
+      return `Hoạt động ${diffInMins} phút trước`;
+    } else if (diffInHours < 24) {
+      return `Hoạt động ${diffInHours} giờ trước`;
+    } else if (diffInDays < 30) {
+      return `Hoạt động ${diffInDays} ngày trước`;
+    } else {
+      return `Hoạt động ${pastDate.toLocaleDateString("vi-VN")}`;
+    }
+  };
+
+  const handleToggleLock = async (user: UserItem) => {
+    const isCurrentlyLocked = lockedState[user.id] ?? user.isLocked ?? false;
+    const newLockedState = !isCurrentlyLocked;
+
+    setLockedState((prev) => ({ ...prev, [user.id]: newLockedState }));
+    setActiveDropdownId(null);
+
+    try {
+      const docIds = user.docIds && user.docIds.length > 0 ? user.docIds : [user.id];
+      await Promise.all(
+        docIds.map((docId) =>
+          updateDoc(doc(db, "users", docId), {
+            isLocked: newLockedState,
+            status: newLockedState ? "disabled" : "active",
+          })
+        )
+      );
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (err) {
+      console.error("Lỗi khi cập nhật trạng thái khóa tài khoản:", err);
+      setLockedState((prev) => ({ ...prev, [user.id]: isCurrentlyLocked }));
+      alert("Không thể cập nhật trạng thái khóa tài khoản. Vui lòng thử lại!");
+    }
+  };
+
+  const handleDeleteClick = (user: UserItem) => {
+    setActiveDropdownId(null);
+    setDeletingUser(user);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deletingUser) return;
+    setIsDeleting(true);
+
+    try {
+      const docIds = deletingUser.docIds && deletingUser.docIds.length > 0 ? deletingUser.docIds : [deletingUser.id];
+      await Promise.all(
+        docIds.map((docId) => deleteDoc(doc(db, "users", docId)))
+      );
+      setDeletingUser(null);
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (err) {
+      console.error("Lỗi khi xóa người dùng khỏi danh sách:", err);
+      alert("Đã xảy ra lỗi khi xóa người dùng. Vui lòng thử lại!");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleRefreshClick = async () => {
     if (isRefreshing) return;
@@ -50,16 +162,16 @@ export default function UserTable({ users, onAddUser, onRefresh }: UserTableProp
       "Họ tên",
       "Email",
       "Vai trò",
-      "Trạng thái máy",
+      "Trạng thái",
       "Số thiết bị",
       "Thiết bị đang quản lý",
       "Ngày tạo (Khởi động)",
-      "Trạng thái hoạt động"
+      "Hoạt động gần nhất"
     ];
 
     const rows = users.map(user => {
       const roleLabel = user.role === "admin" ? "Admin" : user.role === "owner" ? "Chủ máy" : user.role === "guest" ? "Khách" : "Thành viên";
-      const statusLabel = user.status === "active" ? "Đang hoạt động" : user.status === "disabled" ? "Ngoại tuyến" : "Chờ kết nối";
+      const statusLabel = isUserOnline(user) ? "Online" : "Offline";
       return [
         `"${user.fullName.replace(/"/g, '""')}"`,
         `"${user.email.replace(/"/g, '""')}"`,
@@ -68,7 +180,7 @@ export default function UserTable({ users, onAddUser, onRefresh }: UserTableProp
         user.deviceCount,
         `"${user.devices.join(", ").replace(/"/g, '""')}"`,
         `"${user.createdAt}"`,
-        `"${user.lastActiveAt}"`
+        `"${formatRelativeTime(user)}"`
       ];
     });
 
@@ -127,15 +239,20 @@ export default function UserTable({ users, onAddUser, onRefresh }: UserTableProp
     );
   };
 
-  const getStatusBadge = (status: UserItem["status"]) => {
-    const labels = {
-      active: "Đang hoạt động",
-      disabled: "Ngoại tuyến",
-      pending: "Chờ kết nối",
-    };
+  const getStatusBadge = (user: UserItem) => {
+    const online = isUserOnline(user);
+    if (online) {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          Online
+        </span>
+      );
+    }
     return (
-      <span className="text-xs text-slate-900 font-semibold">
-        {labels[status]}
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+        <span className="h-2 w-2 rounded-full bg-slate-300" />
+        Offline
       </span>
     );
   };
@@ -199,7 +316,7 @@ export default function UserTable({ users, onAddUser, onRefresh }: UserTableProp
       </div>
 
       {/* Responsive Table Wrapper */}
-      <div className="overflow-x-auto relative min-h-[300px]">
+      <div className="overflow-x-auto relative min-h-[360px] pb-4">
         <table className="w-full min-w-[1200px] border-collapse text-left text-sm whitespace-nowrap">
           <thead>
             <tr className="border-b border-slate-200 bg-white text-xs font-semibold text-slate-700">
@@ -215,138 +332,136 @@ export default function UserTable({ users, onAddUser, onRefresh }: UserTableProp
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {paginatedUsers.map((user, index) => (
-              <tr
-                key={user.id}
-                className={`group transition-colors duration-150 ${
-                  index % 2 === 0 ? "bg-white" : "bg-[#F5F7FA]"
-                } hover:bg-sky-50/30`}
-              >
-                {/* Người dùng */}
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 font-bold text-sky-700 border border-sky-100/50">
-                      {user.avatarUrl ? (
-                        <img
-                          src={user.avatarUrl}
-                          alt={user.fullName}
-                          className="h-full w-full object-cover rounded-xl"
-                        />
-                      ) : (
-                        getInitials(user.fullName)
-                      )}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-slate-900">
-                        {user.fullName}
+            {paginatedUsers.map((user, index) => {
+              const isLocked = lockedState[user.id] ?? user.isLocked ?? false;
+              return (
+                <tr
+                  key={user.id}
+                  className={`group transition-colors duration-150 ${
+                    index % 2 === 0 ? "bg-white" : "bg-[#F5F7FA]"
+                  } hover:bg-sky-50/30`}
+                >
+                  {/* Người dùng */}
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 font-bold text-sky-700 border border-sky-100/50">
+                        {user.avatarUrl ? (
+                          <img
+                            src={user.avatarUrl}
+                            alt={user.fullName}
+                            className="h-full w-full object-cover rounded-xl"
+                          />
+                        ) : (
+                          getInitials(user.fullName)
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-slate-900 flex items-center gap-2">
+                          {user.fullName}
+                          {isLocked && (
+                            <span className="text-[10px] bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded-full">
+                              Đã khóa
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </td>
+                  </td>
 
-                {/* Email */}
-                <td className="px-4 py-2.5 font-medium text-slate-900">
-                  {user.email}
-                </td>
+                  {/* Email */}
+                  <td className="px-4 py-2.5 font-medium text-slate-900">
+                    {user.email}
+                  </td>
 
-                {/* Vai trò */}
-                <td className="px-4 py-2.5">
-                  {getRoleBadge(user.role)}
-                </td>
+                  {/* Vai trò */}
+                  <td className="px-4 py-2.5">
+                    {getRoleBadge(user.role)}
+                  </td>
 
-                {/* Trạng thái */}
-                <td className="px-4 py-2.5">
-                  {getStatusBadge(user.status)}
-                </td>
+                  {/* Trạng thái */}
+                  <td className="px-4 py-2.5">
+                    {getStatusBadge(user)}
+                  </td>
 
-                {/* Số thiết bị */}
-                <td className="px-4 py-2.5 font-bold text-slate-900 text-center sm:text-left">
-                  {user.deviceCount}
-                </td>
+                  {/* Số thiết bị */}
+                  <td className="px-4 py-2.5 font-bold text-slate-900 text-center sm:text-left">
+                    {user.deviceCount}
+                  </td>
 
-                {/* Thiết bị đang quản lý */}
-                <td className="px-4 py-2.5">
-                  {renderDevices(user.devices)}
-                </td>
+                  {/* Thiết bị đang quản lý */}
+                  <td className="px-4 py-2.5">
+                    {renderDevices(user.devices)}
+                  </td>
 
-                {/* Ngày tạo */}
-                <td className="px-4 py-2.5 text-xs font-semibold text-slate-400">
-                  {user.createdAt}
-                </td>
+                  {/* Ngày tạo */}
+                  <td className="px-4 py-2.5 text-xs font-semibold text-slate-400">
+                    {user.createdAt}
+                  </td>
 
-                {/* Hoạt động gần nhất */}
-                <td className="px-4 py-2.5 text-xs font-bold text-slate-900">
-                  {user.lastActiveAt}
-                </td>
+                  {/* Hoạt động gần nhất */}
+                  <td className="px-4 py-2.5 text-xs font-bold text-slate-900">
+                    {formatRelativeTime(user)}
+                  </td>
 
-                {/* Row Actions Dropdown */}
-                <td className="px-4 py-2.5 relative">
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      title="Xem chi tiết"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-sky-50 hover:text-sky-600 transition duration-150"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      title="Chỉnh sửa"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-sky-50 hover:text-sky-600 transition duration-150"
-                    >
-                      <Edit3 className="h-4 w-4" />
-                    </button>
-
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setActiveDropdownId(activeDropdownId === user.id ? null : user.id)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition duration-150"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-
-                      {activeDropdownId === user.id && (
-                        <div
-                          ref={dropdownRef}
-                          className="absolute right-0 top-full z-[100] mt-1.5 w-48 rounded-xl border border-sky-100 bg-white p-1.5 shadow-xl animate-in fade-in duration-100"
+                  {/* Row Actions Dropdown */}
+                  <td className="px-4 py-2.5 relative">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setActiveDropdownId(activeDropdownId === user.id ? null : user.id)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition duration-150 cursor-pointer"
                         >
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-amber-950 hover:bg-amber-50/70 transition"
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+
+                        {activeDropdownId === user.id && (
+                          <div
+                            ref={dropdownRef}
+                            className={`absolute right-0 z-[100] w-48 rounded-xl border border-sky-100 bg-white p-1.5 shadow-2xl animate-in fade-in duration-100 ${
+                              index >= Math.max(0, paginatedUsers.length - 3)
+                                ? "bottom-full mb-2 origin-bottom-right"
+                                : "top-full mt-1.5 origin-top-right"
+                            }`}
                           >
-                            <Link className="h-3.5 w-3.5 text-slate-400" />
-                            Gán thiết bị
-                          </button>
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-amber-950 hover:bg-amber-50/70 transition"
-                          >
-                            <Lock className="h-3.5 w-3.5 text-slate-400" />
-                            Khóa tài khoản
-                          </button>
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-amber-950 hover:bg-amber-50/70 transition"
-                          >
-                            <Shield className="h-3.5 w-3.5 text-slate-400" />
-                            Đổi vai trò
-                          </button>
-                          <div className="my-1 border-t border-slate-100" />
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-bold text-rose-600 hover:bg-rose-50 transition"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Xóa khỏi danh sách
-                          </button>
-                        </div>
-                      )}
+                            {isLocked ? (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleLock(user)}
+                                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition cursor-pointer"
+                              >
+                                <Unlock className="h-3.5 w-3.5 text-emerald-600" />
+                                Mở khóa tài khoản
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleLock(user)}
+                                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-amber-950 hover:bg-amber-50/70 transition cursor-pointer"
+                              >
+                                <Lock className="h-3.5 w-3.5 text-slate-400" />
+                                Khóa tài khoản
+                              </button>
+                            )}
+
+                            <div className="my-1 border-t border-slate-100" />
+                            
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteClick(user)}
+                              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-bold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Xóa khỏi danh sách
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -363,6 +478,62 @@ export default function UserTable({ users, onAddUser, onRefresh }: UserTableProp
         }}
         itemLabel="người dùng"
       />
+
+      {/* Custom Delete Confirmation Modal */}
+      {deletingUser && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300 animate-fadeIn">
+          <div className="relative w-full max-w-md bg-white/95 rounded-[30px] shadow-2xl border border-rose-100/50 p-6 sm:p-8 flex flex-col items-center text-center overflow-hidden transition-all duration-300 transform scale-100">
+            
+            {/* Top Accent Line */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-500 to-red-600" />
+
+            {/* Trash Warning Icon */}
+            <div className="mt-2 mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-500 shadow-inner">
+              <Trash2 className="h-7 w-7" />
+            </div>
+
+            {/* Modal Title & Message */}
+            <h3 className="text-lg font-bold text-slate-900 uppercase tracking-wide">
+              XÁC NHẬN XÓA NGƯỜI DÙNG
+            </h3>
+            <p className="text-xs text-slate-600 font-medium mt-3 leading-relaxed">
+              Bạn có chắc chắn muốn xóa người dùng <strong className="text-slate-900 font-bold">{deletingUser.fullName}</strong> (<span className="text-rose-600 font-semibold">{deletingUser.email}</span>) khỏi danh sách không?
+            </p>
+            <p className="text-[11px] text-slate-400 italic mt-1.5">
+              Hành động này sẽ xóa dữ liệu người dùng khỏi hệ thống.
+            </p>
+
+            {/* Modal Action Buttons */}
+            <div className="flex items-center gap-3 w-full pt-6">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeletingUser(null)}
+                className="flex-1 h-11 rounded-[16px] border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 active:scale-95 transition duration-150 cursor-pointer disabled:opacity-50"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={confirmDeleteUser}
+                className="flex-1 h-11 rounded-[16px] bg-gradient-to-r from-rose-500 to-red-600 text-xs font-semibold text-white shadow-md shadow-rose-100 hover:from-rose-600 hover:to-red-700 active:scale-95 transition duration-150 cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Đang xóa...</span>
+                  </div>
+                ) : (
+                  "Xác nhận xóa"
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

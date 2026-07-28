@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, User, Mail, Shield, AlertCircle, Cpu } from "lucide-react";
-import { collection, addDoc } from "firebase/firestore";
+import { X, AlertCircle } from "lucide-react";
+import { collection, addDoc, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
 import { ref, onValue } from "firebase/database";
 import { db, rtdb } from "@/src/lib/firebase";
 
@@ -71,19 +71,37 @@ export default function AddUserModal({ onClose, onSuccess }: AddUserModalProps) 
         deviceName = parts[1];
       }
 
-      // Add user to Firestore users collection
       const usersCol = collection(db, "users");
-      await addDoc(usersCol, {
-        fullName: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        role,
-        status,
-        deviceCode,
-        deviceName,
-        createdAt: new Date().toISOString(),
-        profilePicture: "",
-        isActive: status === "active"
-      });
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Check if user with this email already exists
+      const existingQuery = query(usersCol, where("email", "==", normalizedEmail));
+      const existingSnapshot = await getDocs(existingQuery);
+
+      if (!existingSnapshot.empty) {
+        // Update existing user document role and details
+        const existingDoc = existingSnapshot.docs[0];
+        await updateDoc(doc(db, "users", existingDoc.id), {
+          fullName: fullName.trim(),
+          role,
+          status,
+          ...(deviceCode ? { deviceCode, deviceName } : {}),
+          isActive: status === "active",
+        });
+      } else {
+        // Add new user doc
+        await addDoc(usersCol, {
+          fullName: fullName.trim(),
+          email: normalizedEmail,
+          role,
+          status,
+          deviceCode,
+          deviceName,
+          createdAt: new Date().toISOString(),
+          profilePicture: "",
+          isActive: status === "active",
+        });
+      }
 
       onSuccess();
     } catch (err: any) {
@@ -136,7 +154,6 @@ export default function AddUserModal({ onClose, onSuccess }: AddUserModalProps) 
               Họ và tên <span className="text-rose-500">*</span>
             </label>
             <div className="relative flex items-center">
-              <User className="absolute left-3.5 h-4 w-4 text-slate-400 z-10" />
               <input
                 type="text"
                 disabled={loading}
@@ -146,7 +163,7 @@ export default function AddUserModal({ onClose, onSuccess }: AddUserModalProps) 
                   if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: "" }));
                 }}
                 placeholder="Ví dụ: Nguyễn Văn A"
-                className={`w-full pl-10 pr-4 py-3 bg-white border rounded-[16px] text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-4 focus:outline-none transition-all duration-200 ${
+                className={`w-full px-4 py-3 bg-white border rounded-[16px] text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-4 focus:outline-none transition-all duration-200 ${
                   errors.fullName
                     ? "border-rose-300 focus:border-rose-500 focus:ring-rose-100"
                     : "border-slate-200 focus:border-amber-500 focus:ring-amber-100"
@@ -167,7 +184,6 @@ export default function AddUserModal({ onClose, onSuccess }: AddUserModalProps) 
               Địa chỉ Email <span className="text-rose-500">*</span>
             </label>
             <div className="relative flex items-center">
-              <Mail className="absolute left-3.5 h-4 w-4 text-slate-400 z-10" />
               <input
                 type="email"
                 disabled={loading}
@@ -177,7 +193,7 @@ export default function AddUserModal({ onClose, onSuccess }: AddUserModalProps) 
                   if (errors.email) setErrors((prev) => ({ ...prev, email: "" }));
                 }}
                 placeholder="Ví dụ: anguyen@gmail.com"
-                className={`w-full pl-10 pr-4 py-3 bg-white border rounded-[16px] text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-4 focus:outline-none transition-all duration-200 ${
+                className={`w-full px-4 py-3 bg-white border rounded-[16px] text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-4 focus:outline-none transition-all duration-200 ${
                   errors.email
                     ? "border-rose-300 focus:border-rose-500 focus:ring-rose-100"
                     : "border-slate-200 focus:border-amber-500 focus:ring-amber-100"
@@ -198,12 +214,11 @@ export default function AddUserModal({ onClose, onSuccess }: AddUserModalProps) 
               Vai trò tài khoản
             </label>
             <div className="relative flex items-center">
-              <Shield className="absolute left-3.5 h-4 w-4 text-slate-400 z-10" />
               <select
                 disabled={loading}
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-[16px] text-sm text-slate-800 focus:ring-4 focus:outline-none focus:border-amber-500 focus:ring-amber-100 transition-all duration-200 appearance-none cursor-pointer"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-[16px] text-sm text-slate-800 focus:ring-4 focus:outline-none focus:border-amber-500 focus:ring-amber-100 transition-all duration-200 cursor-pointer"
               >
                 <option value="owner">Chủ máy</option>
                 <option value="guest">Khách</option>
@@ -218,12 +233,11 @@ export default function AddUserModal({ onClose, onSuccess }: AddUserModalProps) 
               Gán thiết bị quản lý (Tùy chọn)
             </label>
             <div className="relative flex items-center">
-              <Cpu className="absolute left-3.5 h-4 w-4 text-slate-400 z-10" />
               <select
                 disabled={loading}
                 value={selectedDevice}
                 onChange={(e) => setSelectedDevice(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-[16px] text-sm text-slate-800 focus:ring-4 focus:outline-none focus:border-amber-500 focus:ring-amber-100 transition-all duration-200 appearance-none cursor-pointer"
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-[16px] text-sm text-slate-800 focus:ring-4 focus:outline-none focus:border-amber-500 focus:ring-amber-100 transition-all duration-200 cursor-pointer"
               >
                 <option value="">Không gán thiết bị nào</option>
                 {incubators.map((inc) => (

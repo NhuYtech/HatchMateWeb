@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { Image as ImageIcon, X } from "lucide-react";
 import { PhotoRecord } from "@/src/types/camera";
 import DataTablePagination from "@/src/components/common/DataTablePagination";
@@ -161,7 +162,7 @@ export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTablePro
       />
 
       {/* Lightbox Modal Sạch Đẹp - Nền trắng, căn giữa */}
-      {previewPhoto && (
+      {previewPhoto && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative max-w-2xl w-full rounded-[28px] bg-white p-6 shadow-2xl border border-sky-100 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
             <div className="relative border-b border-slate-100 pb-3 text-center">
@@ -187,7 +188,8 @@ export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTablePro
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

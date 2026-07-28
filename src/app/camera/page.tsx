@@ -6,15 +6,14 @@ import CameraMiniStatCard from "@/src/components/camera/CameraMiniStatCard";
 import CameraGrid from "@/src/components/camera/CameraGrid";
 import CameraTable from "@/src/components/camera/CameraTable";
 import AIAnalysisTable from "@/src/components/camera/AIAnalysisTable";
-import CameraDetailModal from "@/src/components/camera/CameraDetailModal";
+import AppPhotoGalleryTable from "@/src/components/camera/AppPhotoGalleryTable";
 
 import { ref, onValue } from "firebase/database";
 import { rtdb } from "@/src/lib/firebase";
-import { CameraItem, AiRecord } from "@/src/types/camera";
-import {
+import { CameraItem, AiRecord, PhotoRecord } from "@/src/types/camera";
+import { 
   Video,
   ShieldCheck,
-  Camera,
   Brain,
   VideoOff
 } from "lucide-react";
@@ -23,9 +22,9 @@ export default function CameraPage() {
   const [selectedCamera, setSelectedCamera] = useState<CameraItem | null>(null);
   const [cameras, setCameras] = useState<CameraItem[]>([]);
   const [aiRecords, setAiRecords] = useState<AiRecord[]>([]);
+  const [photoRecords, setPhotoRecords] = useState<PhotoRecord[]>([]);
   const [stats, setStats] = useState({
     totalCameras: 0,
-    totalEggs: 0,
     analyzedImages: 0,
     variationAlerts: 0,
   });
@@ -39,40 +38,51 @@ export default function CameraPage() {
         const data = snapshot.val();
         const activeCameras: CameraItem[] = [];
         const activeAiRecords: AiRecord[] = [];
+        const activePhotos: PhotoRecord[] = [];
 
         Object.keys(data).forEach((key) => {
           const item = data[key];
           if (typeof item === "object" && item !== null) {
-            // Check if device has camera
-            const hasCamera = Boolean(item.hasCamera ?? item.control?.camera ?? item.camera);
+            const hasCamera = Boolean(item.hasCamera ?? item.control?.camera);
             if (hasCamera) {
-              const cameraStatus = (item.camera?.status ?? item.status ?? "offline").toLowerCase() === "online" ? "online" : "offline";
               const status = String(item.status ?? (item.alert === "NORMAL" ? "online" : (item.alert ? "warning" : "offline"))).toLowerCase();
               const lastSeen = item.lastSeen ?? "Vừa xong";
               const deviceName = item.name ?? key;
 
-              const eggCount = item.telemetry?.eggCount !== undefined ? Number(item.telemetry.eggCount) : 24;
-              const previousEggCount = status === "warning" ? 24 : eggCount;
-              const hasVariation = eggCount !== previousEggCount;
+              const initialEggCount = item.cycle?.initialEggCount !== undefined
+                ? Number(item.cycle.initialEggCount)
+                : (item.telemetry?.initialEggCount !== undefined ? Number(item.telemetry.initialEggCount) : 24);
+
+              const eggCount = item.telemetry?.eggCount !== undefined ? Number(item.telemetry.eggCount) : initialEggCount;
+              const isEggLost = item.telemetry?.isEggLost === true || (eggCount < initialEggCount && initialEggCount > 0);
+              const lostEggCount = isEggLost ? (initialEggCount - eggCount) : 0;
+
+              const cameraUrl = item.camera?.url || item.camera?.streamUrl || item.camera?.stream_url || item.camera_url || item.streamUrl || "http://192.168.88.220:81/stream";
+              const cameraIp = item.camera?.ipAddress || item.camera?.ip || item.ipAddress || "192.168.88.220:81";
 
               activeCameras.push({
                 id: `cam-${key}`,
                 deviceId: key,
                 deviceName: deviceName,
-                cameraName: `Cam ${deviceName}`,
+                cameraName: "HatchMate-Cam",
                 locationLabel: "Trạm ấp",
-                status: cameraStatus,
-                previewImage: null,
+                status: status === "offline" ? "offline" : "online",
+                previewImage: item.camera?.previewImage ?? null,
                 lastCaptureAt: lastSeen,
-                aiStatus: hasVariation ? "alert" : "analyzed",
-                aiAlertCount: hasVariation ? 1 : 0,
-                lastAiSummary: hasVariation
-                  ? `Cảnh báo: Số lượng trứng thay đổi (Ban đầu: ${previousEggCount}, Hiện tại: ${eggCount})`
-                  : `Số lượng trứng ổn định: ${eggCount} quả`,
-                lastAiConfidence: 98,
-                streamEnabled: false,
+                aiStatus: isEggLost ? "alert" : "analyzed",
+                aiAlertCount: isEggLost ? 1 : 0,
+                lastAiSummary: isEggLost 
+                  ? `🚨 CẢNH BÁO MẤT TRỨNG: Ban đầu ${initialEggCount} quả, hiện còn ${eggCount} quả (Mất ${lostEggCount} quả)` 
+                  : `Số lượng trứng ổn định: ${eggCount}/${initialEggCount} quả`,
+                lastAiConfidence: item.camera?.confidence !== undefined ? Math.round(Number(item.camera.confidence) * 100) : 98,
+                streamEnabled: true,
+                streamUrl: cameraUrl,
+                ipAddress: cameraIp,
                 eggCount,
-                previousEggCount,
+                previousEggCount: initialEggCount,
+                initialEggCount,
+                isEggLost,
+                lostEggCount,
               });
 
               activeAiRecords.push({
@@ -81,43 +91,152 @@ export default function CameraPage() {
                 deviceId: key,
                 deviceName: deviceName,
                 capturedAt: lastSeen,
-                imageUrl: null,
-                resultStatus: hasVariation ? "warning" : "normal",
-                resultTitle: hasVariation ? "Số lượng thay đổi" : "Số lượng ổn định",
-                resultSummary: hasVariation
-                  ? `Phát hiện số trứng thay đổi từ ${previousEggCount} xuống ${eggCount} quả`
-                  : `AI nhận diện thành công: ${eggCount} quả trứng, không có thay đổi`,
-                confidence: 98,
-                processedBy: "HatchMate AI v1.0",
+                imageUrl: item.camera?.previewImage ?? null,
+                resultStatus: isEggLost ? "danger" : "normal",
+                resultTitle: isEggLost ? "CẢNH BÁO MẤT TRỨNG" : "Số lượng ổn định",
+                resultSummary: isEggLost 
+                  ? `Phát hiện sụt giảm trứng từ ${initialEggCount} xuống ${eggCount} quả (Mất ${lostEggCount} quả)` 
+                  : `AI nhận diện thành công: ${eggCount} quả trứng, giữ nguyên mốc ban đầu ${initialEggCount} quả`,
+                confidence: item.camera?.confidence !== undefined ? Math.round(Number(item.camera.confidence) * 100) : 98,
+                processedBy: "HatchMate YOLOv8 AI",
                 notes: null,
               });
+
+              if (item.ai_events && typeof item.ai_events === "object") {
+                Object.keys(item.ai_events).forEach((evKey) => {
+                  const ev = item.ai_events[evKey];
+                  if (ev && typeof ev === "object") {
+                    const isManualEvent = ev.type === "manual" || 
+                                         (ev.title && (String(ev.title).includes("THỦ CÔNG") || String(ev.title).includes("NGƯỜI DÙNG")));
+
+                    const titleMatch = ev.title ? String(ev.title).match(/(\d+)\s*quả/i) : null;
+                    const evEggCount = ev.detectedLabel !== undefined 
+                      ? Number(ev.detectedLabel) 
+                      : (ev.eggCount !== undefined 
+                          ? Number(ev.eggCount) 
+                          : (titleMatch ? Number(titleMatch[1]) : eggCount));
+
+                    const evIsLost = evEggCount < initialEggCount && initialEggCount > 0;
+                    
+                    let parsedConfidence: number | null = null;
+                    if (!isManualEvent) {
+                      if (ev.confidence !== undefined && ev.confidence !== null) {
+                        const c = Number(ev.confidence);
+                        parsedConfidence = c <= 1 ? Math.round(c * 100) : Math.round(c);
+                      } else if (ev.type === "ai" || titleMatch) {
+                        parsedConfidence = 95;
+                      }
+                    }
+
+                    activeAiRecords.unshift({
+                      id: `ai-event-${evKey}`,
+                      cameraId: `cam-${key}`,
+                      deviceId: key,
+                      deviceName: deviceName,
+                      capturedAt: ev.time || ev.timestamp || lastSeen,
+                      imageUrl: ev.imageUrl || ev.image || item.camera?.previewImage || null,
+                      resultStatus: isManualEvent ? "manual" : (evIsLost ? "danger" : "normal"),
+                      resultTitle: ev.title || (isManualEvent ? "ẢNH CHỤP THỦ CÔNG (NGƯỜI DÙNG)" : (evIsLost ? "CẢNH BÁO MẤT TRỨNG" : "Số lượng ổn định")),
+                      resultSummary: isManualEvent 
+                        ? "Ảnh chụp từ ứng dụng/Web, chưa qua phân tích AI" 
+                        : (evIsLost 
+                            ? `Phát hiện sụt giảm trứng: Ban đầu ${initialEggCount} quả, hiện còn ${evEggCount} quả (Mất ${initialEggCount - evEggCount} quả)` 
+                            : `AI nhận diện thành công: ${evEggCount} quả trứng`),
+                      confidence: parsedConfidence,
+                      processedBy: isManualEvent ? "Chụp thủ công từ ứng dụng" : (ev.processedBy || "HatchMate YOLOv8 AI"),
+                      notes: null,
+                    });
+
+                    if (ev.imageUrl || ev.image) {
+                      activePhotos.unshift({
+                        id: `photo-${evKey}`,
+                        title: ev.title || "Ảnh chụp từ ứng dụng",
+                        time: ev.time || ev.timestamp || lastSeen,
+                        imageUrl: ev.imageUrl || ev.image,
+                        type: (ev.type as any) || "manual",
+                        deviceName,
+                      });
+                    }
+                  }
+                });
+              }
             }
           }
         });
 
-        const total = activeCameras.length;
-        const totalEggs = activeCameras.reduce((sum, c) => sum + (c.eggCount || 0), 0);
-        const onlineCount = activeCameras.filter((c) => c.status === "online").length;
-        const analyzed = onlineCount > 0 ? onlineCount * 5 + 18 : 0;
-        const alerts = activeCameras.filter((c) => c.eggCount !== undefined && c.previousEggCount !== undefined && c.eggCount !== c.previousEggCount).length;
+        let total = activeCameras.length;
+        let onlineCount = activeCameras.filter((c) => c.status === "online").length;
+        let analyzed = activeAiRecords.length > 0 ? activeAiRecords.length : (onlineCount > 0 ? onlineCount * 5 + 18 : 0);
+        let alerts = activeCameras.filter((c) => c.isEggLost).length;
+
+        if (activeCameras.length === 0) {
+          const mockCamera: CameraItem = {
+            id: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
+            cameraName: "Cam MATG01 (Chạy thử)", locationLabel: "Trạm ấp",
+            status: "online", previewImage: "/incubator_eggs.png",
+            streamUrl: "http://192.168.88.220:81/stream",
+            ipAddress: "192.168.88.220:81",
+            lastCaptureAt: new Date().toLocaleTimeString("vi-VN"),
+            aiStatus: "analyzed", aiAlertCount: 0,
+            lastAiSummary: "Số lượng trứng ổn định: 24/24 quả",
+            lastAiConfidence: 94, streamEnabled: true, eggCount: 24, previousEggCount: 24, initialEggCount: 24
+          };
+          activeCameras.push(mockCamera);
+          activeAiRecords.push({
+            id: "ai-MATG01", cameraId: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
+            capturedAt: new Date().toLocaleTimeString("vi-VN"), imageUrl: "/incubator_eggs.png",
+            resultStatus: "normal", resultTitle: "Số lượng ổn định",
+            resultSummary: "AI nhận diện thành công: 24 quả trứng, không có thay đổi",
+            confidence: 94, processedBy: "HatchMate AI v1.0", notes: null
+          });
+          activePhotos.push({
+            id: "photo-MATG01-1",
+            title: "Ảnh chụp thủ công (Người dùng)",
+            time: new Date().toLocaleTimeString("vi-VN"),
+            imageUrl: "/incubator_eggs.png",
+            type: "manual",
+            deviceName: "MATG01",
+          });
+          total = 1; analyzed = 24; alerts = 0;
+        }
 
         setCameras(activeCameras);
         setAiRecords(activeAiRecords);
+        setPhotoRecords(activePhotos);
         setStats({
           totalCameras: total,
-          totalEggs,
           analyzedImages: analyzed,
           variationAlerts: alerts,
         });
       } else {
-        setCameras([]);
-        setAiRecords([]);
-        setStats({
-          totalCameras: 0,
-          totalEggs: 0,
-          analyzedImages: 0,
-          variationAlerts: 0,
-        });
+        const mockCamera: CameraItem = {
+          id: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
+          cameraName: "Cam MATG01 (Chạy thử)", locationLabel: "Trạm ấp",
+          status: "online", previewImage: "/incubator_eggs.png",
+          streamUrl: "http://192.168.88.220:81/stream",
+          ipAddress: "192.168.88.220:81",
+          lastCaptureAt: new Date().toLocaleTimeString("vi-VN"),
+          aiStatus: "analyzed", aiAlertCount: 0,
+          lastAiSummary: "Số lượng trứng ổn định: 24/24 quả",
+          lastAiConfidence: 94, streamEnabled: true, eggCount: 24, previousEggCount: 24, initialEggCount: 24
+        };
+        setCameras([mockCamera]);
+        setAiRecords([{
+          id: "ai-MATG01", cameraId: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
+          capturedAt: new Date().toLocaleTimeString("vi-VN"), imageUrl: "/incubator_eggs.png",
+          resultStatus: "normal", resultTitle: "Số lượng ổn định",
+          resultSummary: "AI nhận diện thành công: 24 quả trứng, không có thay đổi",
+          confidence: 94, processedBy: "HatchMate AI v1.0", notes: null
+        }]);
+        setPhotoRecords([{
+          id: "photo-MATG01-1",
+          title: "Ảnh chụp thủ công (Người dùng)",
+          time: new Date().toLocaleTimeString("vi-VN"),
+          imageUrl: "/incubator_eggs.png",
+          type: "manual",
+          deviceName: "MATG01",
+        }]);
+        setStats({ totalCameras: 1, analyzedImages: 24, variationAlerts: 0 });
       }
       setLoading(false);
     }, (err) => {
@@ -129,23 +248,17 @@ export default function CameraPage() {
   }, []);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-6">
       {/* Header */}
       <CameraPageHeader totalCameras={stats.totalCameras} />
 
-      {/* Mini Stats Component Section */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 1. Thống kê Mini */}
+      <section className="grid gap-4 sm:grid-cols-3">
         <CameraMiniStatCard
           label="Tổng camera"
           value={stats.totalCameras}
           icon={Video}
           accent="indigo"
-        />
-        <CameraMiniStatCard
-          label="Tổng trứng quét"
-          value={stats.totalEggs}
-          icon={Camera}
-          accent="sky"
         />
         <CameraMiniStatCard
           label="Ảnh đã phân tích"
@@ -154,14 +267,14 @@ export default function CameraPage() {
           accent="emerald"
         />
         <CameraMiniStatCard
-          label="Cảnh báo biến động"
+          label="Cảnh báo mất trứng"
           value={stats.variationAlerts}
           icon={Brain}
           accent="rose"
         />
       </section>
 
-      {/* Camera Grid & Table Section */}
+      {/* 2. Thẻ chứa thông tin máy ấp và camera */}
       {loading ? (
         <div className="flex h-32 items-center justify-center text-xs text-slate-400 font-semibold">
           Đang tải thông tin camera...
@@ -173,38 +286,24 @@ export default function CameraPage() {
           </div>
           <h3 className="text-base font-bold text-sky-950">Chưa có camera nào</h3>
           <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500 leading-relaxed">
-            Hiện tại không tìm thấy thiết bị camera nào khớp với tiêu chí tìm kiếm hoặc trạng thái của bộ lọc.
+            Hiện tại không tìm thấy thiết bị camera nào kết nối trong hệ thống.
           </p>
         </div>
       ) : (
-        <>
-          <CameraGrid
-            cameras={cameras}
-            onViewDetail={setSelectedCamera}
-          />
-
-          <CameraTable
-            cameras={cameras}
-            onSelectCamera={setSelectedCamera}
-            onCaptureNew={(id) => {
-              console.log("Request manual capture for camera:", id);
-            }}
-          />
-        </>
-      )}
-
-      {/* AI Analysis Section */}
-      {!loading && aiRecords.length > 0 && <AIAnalysisTable records={aiRecords} />}
-
-      {/* Camera Detail Modal */}
-      {selectedCamera && (
-        <CameraDetailModal
-          isOpen={selectedCamera !== null}
-          onClose={() => setSelectedCamera(null)}
-          deviceId={selectedCamera.deviceId}
-          initialCamera={selectedCamera}
+        <CameraTable 
+          cameras={cameras}
+          onSelectCamera={setSelectedCamera}
+          onCaptureNew={(id) => {
+            console.log("Request manual capture for camera:", id);
+          }}
         />
       )}
+
+      {/* 4. Lịch sử phân tích của AI */}
+      {!loading && aiRecords.length > 0 && <AIAnalysisTable records={aiRecords} />}
+
+      {/* 5. Lịch sử ảnh đã được chụp từ App/Web */}
+      {!loading && <AppPhotoGalleryTable photos={photoRecords} />}
     </div>
   );
 }

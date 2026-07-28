@@ -66,9 +66,15 @@ export default function CameraTable({ cameras, onSelectCamera, onCaptureNew }: C
               >
                 {/* Thông tin Máy ấp */}
                 <td className="px-5 py-3">
-                  <div className="space-y-0.5">
-                    <p className="font-bold text-sky-950 text-sm">{camera.deviceName}</p>
-                    <p className="font-mono text-xs text-slate-400 font-semibold">{camera.deviceId}</p>
+                  <div className="space-y-0.5 text-xs">
+                    <p className="font-bold text-slate-800">
+                      <span className="text-slate-400 font-medium">Tên máy:</span>{" "}
+                      <span className="text-sky-950 font-bold">{camera.deviceName}</span>
+                    </p>
+                    <p className="font-mono text-slate-600">
+                      <span className="text-slate-400 font-medium font-sans">Mã máy:</span>{" "}
+                      <span className="font-bold text-slate-700">{camera.deviceId}</span>
+                    </p>
                   </div>
                 </td>
 
@@ -85,14 +91,12 @@ export default function CameraTable({ cameras, onSelectCamera, onCaptureNew }: C
                 {/* Trạng thái */}
                 <td className="px-5 py-3">
                   {camera.status === "online" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-100">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Đang hoạt động
+                    <span className="text-xs font-bold text-emerald-600">
+                      Online
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500 border border-slate-200">
-                      <span className="h-2 w-2 rounded-full bg-slate-400" />
-                      Ngoại tuyến
+                    <span className="text-xs font-semibold text-slate-500">
+                      Offline
                     </span>
                   )}
                 </td>

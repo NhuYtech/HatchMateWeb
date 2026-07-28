@@ -33,7 +33,7 @@ export interface CameraItem {
   captureUrl?: string;
 }
 
-export type AiResultStatus = "normal" | "warning" | "danger";
+export type AiResultStatus = "normal" | "warning" | "danger" | "manual" | "pending";
 
 export interface AiRecord {
   id: string;
@@ -45,7 +45,7 @@ export interface AiRecord {
   resultStatus: AiResultStatus;
   resultTitle: string;
   resultSummary: string;
-  confidence: number;
+  confidence?: number | null;
   processedBy: string;
   notes?: string | null;
 }

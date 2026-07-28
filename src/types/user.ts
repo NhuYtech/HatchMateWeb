@@ -13,6 +13,10 @@ export interface UserItem {
   createdAt: string;
   lastActiveAt: string;
   avatarUrl?: string | null;
+  isLocked?: boolean;
+  isOnline?: boolean;
+  docIds?: string[];
+  rawLastActive?: string | number | null;
 }
 
 export interface UsersSummary {

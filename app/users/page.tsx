@@ -9,6 +9,7 @@ import { ref, onValue } from "firebase/database";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db, rtdb } from "@/src/lib/firebase";
 import { UserItem } from "@/src/types/user";
+import { useAuth } from "@/src/components/AuthProvider";
 import {
   Users,
   UserCheck,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 
 export default function UsersPage() {
+  const { currentUser } = useAuth();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -31,22 +33,61 @@ export default function UsersPage() {
     let currentIncubatorsData: any = {};
 
     const combineAndSet = (usersData: any[], incubatorsData: any) => {
-      const mappedUsers: UserItem[] = usersData.map((u) => {
-        // Find all incubators matching this user's deviceCode or deviceName
+      // Group raw user docs by email to prevent 1 account from having multiple role rows
+      const usersByEmail = new Map<string, any[]>();
+      usersData.forEach((u) => {
+        const emailKey = (u.email || "").toLowerCase().trim();
+        const key = emailKey || u.uid || u.id;
+        if (!usersByEmail.has(key)) {
+          usersByEmail.set(key, []);
+        }
+        usersByEmail.get(key)!.push(u);
+      });
+
+      const roleHierarchy: Record<string, number> = {
+        admin: 4,
+        owner: 3,
+        user: 2,
+        guest: 1,
+      };
+
+      const mappedUsers: UserItem[] = Array.from(usersByEmail.entries()).map(([emailKey, docs]) => {
+        // Pick primary doc (the one with highest role or newest)
+        const primaryDoc = docs.reduce((prev, curr) => {
+          const prevRank = roleHierarchy[prev.role] || 0;
+          const currRank = roleHierarchy[curr.role] || 0;
+          return currRank > prevRank ? curr : prev;
+        }, docs[0]);
+
+        // Determine combined highest role
+        let highestRole = primaryDoc.role || "guest";
+        docs.forEach((d) => {
+          if ((roleHierarchy[d.role] || 0) > (roleHierarchy[highestRole] || 0)) {
+            highestRole = d.role;
+          }
+        });
+
+        // Find all incubators matching any of this user's deviceCodes or deviceNames
         const userIncubators: any[] = [];
         if (incubatorsData) {
+          const matchedKeys = new Set<string>();
           Object.keys(incubatorsData).forEach((key) => {
             const inc = incubatorsData[key];
-            if (
-              (u.deviceCode && String(inc.code) === String(u.deviceCode)) ||
-              (u.deviceName && String(inc.name) === String(u.deviceName))
-            ) {
-              userIncubators.push({ id: key, ...inc });
-            }
+            docs.forEach((u) => {
+              if (
+                (u.deviceCode && String(inc.code) === String(u.deviceCode)) ||
+                (u.deviceName && String(inc.name) === String(u.deviceName))
+              ) {
+                if (!matchedKeys.has(key)) {
+                  matchedKeys.add(key);
+                  userIncubators.push({ id: key, ...inc });
+                }
+              }
+            });
           });
         }
 
-        // 1. Trạng thái hoạt động của máy (Machine running status)
+        // 1. Machine running status
         let mappedStatus: any = "pending";
         if (userIncubators.length > 0) {
           const primaryInc = userIncubators[0];
@@ -54,18 +95,16 @@ export default function UsersPage() {
           if (rawStatus === "online" || primaryInc.alert === "NORMAL") {
             mappedStatus = "active";
           } else {
-            mappedStatus = "disabled"; // offline / other status
+            mappedStatus = "disabled";
           }
         }
 
-        // 2. Số thiết bị (total devices managed by user)
+        // 2. Devices count & names
         const deviceCount = userIncubators.length;
-
-        // 3. Thiết bị đang quản lý (names of machines)
         const devices = userIncubators.map((inc) => inc.name || inc.id);
 
-        // 4. Ngày tạo là ngày người dùng khởi động máy (startDate of incubation cycle)
-        let createdAtStr = u.createdAt || "";
+        // 3. Created date
+        let createdAtStr = primaryDoc.createdAt || "";
         if (userIncubators.length > 0 && userIncubators[0].cycle?.startDate) {
           const startDate = new Date(userIncubators[0].cycle.startDate);
           if (!isNaN(startDate.getTime())) {
@@ -90,18 +129,27 @@ export default function UsersPage() {
           createdAtStr = "Chưa khởi động";
         }
 
+        const isLocked = docs.some((d) => d.isLocked === true);
+        const isOnline = docs.some((d) => d.isOnline === true);
+        const docIds = docs.map((d) => d.id);
+        const rawLastActive = primaryDoc.lastActiveAt || primaryDoc.updatedAt || primaryDoc.createdAt || null;
+
         return {
-          id: u.uid || u.id,
-          fullName: u.fullName || "Người dùng ẩn danh",
-          email: u.email || "Chưa cập nhật",
-          uid: u.uid || u.id,
-          role: (u.role || "user") as any,
+          id: primaryDoc.uid || primaryDoc.id,
+          fullName: primaryDoc.fullName || "Người dùng ẩn danh",
+          email: primaryDoc.email || "Chưa cập nhật",
+          uid: primaryDoc.uid || primaryDoc.id,
+          role: (highestRole || "user") as any,
           status: mappedStatus,
           deviceCount: deviceCount,
           devices: devices,
           createdAt: createdAtStr,
-          lastActiveAt: u.isActive ? "Đang hoạt động" : "Ngoại tuyến",
-          avatarUrl: u.profilePicture || null,
+          lastActiveAt: primaryDoc.lastActiveAt || primaryDoc.createdAt || "",
+          avatarUrl: primaryDoc.profilePicture || null,
+          isLocked: isLocked,
+          isOnline: isOnline,
+          docIds: docIds,
+          rawLastActive: rawLastActive,
         };
       });
 
@@ -145,9 +193,9 @@ export default function UsersPage() {
 
   // Calculate live summary stats
   const totalUsers = users.length;
-  const activeUsers = users.filter((u) => u.status === "active").length;
+  const activeUsers = users.filter((u) => currentUser?.email && u.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()).length;
   const adminUsers = users.filter((u) => u.role === "admin" || u.role === "owner").length;
-  const disabledUsers = users.filter((u) => u.status === "disabled").length;
+  const disabledUsers = totalUsers - activeUsers;
 
   return (
     <div className="grid gap-4">

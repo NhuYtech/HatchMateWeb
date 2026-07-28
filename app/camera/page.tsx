@@ -108,9 +108,28 @@ export default function CameraPage() {
                 Object.keys(item.ai_events).forEach((evKey) => {
                   const ev = item.ai_events[evKey];
                   if (ev && typeof ev === "object") {
-                    const evEggCount = ev.eggCount !== undefined ? Number(ev.eggCount) : eggCount;
+                    const isManualEvent = ev.type === "manual" || 
+                                         (ev.title && (String(ev.title).includes("THỦ CÔNG") || String(ev.title).includes("NGƯỜI DÙNG")));
+
+                    const titleMatch = ev.title ? String(ev.title).match(/(\d+)\s*quả/i) : null;
+                    const evEggCount = ev.detectedLabel !== undefined 
+                      ? Number(ev.detectedLabel) 
+                      : (ev.eggCount !== undefined 
+                          ? Number(ev.eggCount) 
+                          : (titleMatch ? Number(titleMatch[1]) : eggCount));
+
                     const evIsLost = evEggCount < initialEggCount && initialEggCount > 0;
                     
+                    let parsedConfidence: number | null = null;
+                    if (!isManualEvent) {
+                      if (ev.confidence !== undefined && ev.confidence !== null) {
+                        const c = Number(ev.confidence);
+                        parsedConfidence = c <= 1 ? Math.round(c * 100) : Math.round(c);
+                      } else if (ev.type === "ai" || titleMatch) {
+                        parsedConfidence = 95;
+                      }
+                    }
+
                     activeAiRecords.unshift({
                       id: `ai-event-${evKey}`,
                       cameraId: `cam-${key}`,
@@ -118,13 +137,15 @@ export default function CameraPage() {
                       deviceName: deviceName,
                       capturedAt: ev.time || ev.timestamp || lastSeen,
                       imageUrl: ev.imageUrl || ev.image || item.camera?.previewImage || null,
-                      resultStatus: evIsLost ? "danger" : "normal",
-                      resultTitle: ev.title || (evIsLost ? "CẢNH BÁO MẤT TRỨNG" : "Số lượng ổn định"),
-                      resultSummary: evIsLost 
-                        ? `Phát hiện sụt giảm trứng: Ban đầu ${initialEggCount} quả, hiện còn ${evEggCount} quả (Mất ${initialEggCount - evEggCount} quả)` 
-                        : `AI nhận diện thành công: ${evEggCount} quả trứng`,
-                      confidence: ev.confidence !== undefined ? Math.round(Number(ev.confidence) * 100) : 98,
-                      processedBy: "HatchMate App Sync",
+                      resultStatus: isManualEvent ? "manual" : (evIsLost ? "danger" : "normal"),
+                      resultTitle: ev.title || (isManualEvent ? "ẢNH CHỤP THỦ CÔNG (NGƯỜI DÙNG)" : (evIsLost ? "CẢNH BÁO MẤT TRỨNG" : "Số lượng ổn định")),
+                      resultSummary: isManualEvent 
+                        ? "Ảnh chụp từ ứng dụng/Web, chưa qua phân tích AI" 
+                        : (evIsLost 
+                            ? `Phát hiện sụt giảm trứng: Ban đầu ${initialEggCount} quả, hiện còn ${evEggCount} quả (Mất ${initialEggCount - evEggCount} quả)` 
+                            : `AI nhận diện thành công: ${evEggCount} quả trứng`),
+                      confidence: parsedConfidence,
+                      processedBy: isManualEvent ? "Chụp thủ công từ ứng dụng" : (ev.processedBy || "HatchMate YOLOv8 AI"),
                       notes: null,
                     });
 
@@ -286,7 +307,7 @@ export default function CameraPage() {
       {/* 4. Lịch sử phân tích của AI */}
       {!loading && aiRecords.length > 0 && <AIAnalysisTable records={aiRecords} />}
 
-      {/* 5. Lịch sử ảnh đã được chụp sẽ được đưa từ app về web */}
+      {/* 5. Lịch sử ảnh đã được chụp từ App/Web */}
       {!loading && <AppPhotoGalleryTable photos={photoRecords} />}
     </div>
   );
