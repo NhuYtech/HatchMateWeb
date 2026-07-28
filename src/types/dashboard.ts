@@ -23,6 +23,7 @@ export interface DeviceItem {
   remainingDays: number;
   hasCamera: boolean;
   lastSeen: string;
+  eggCount?: number;
 }
 
 export interface AlertItem {

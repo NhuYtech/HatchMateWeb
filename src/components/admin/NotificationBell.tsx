@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { Bell, WifiOff, AlertTriangle, X, CheckCheck, PlusCircle, UserPlus } from "lucide-react";
 import { ref, onValue } from "firebase/database";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -66,30 +65,43 @@ const TYPE_CONFIG: Record<NotifType, { icon: React.ReactNode; bg: string; badge:
 };
 
 export default function NotificationBell() {
-  const router = useRouter();
   const [notifs, setNotifs] = useState<NotifItem[]>([]);
   const [open, setOpen] = useState(false);
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [readIds, setReadIds] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("hatchmate_read_notifications");
+        if (saved) {
+          return new Set(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.error("Error reading readIds from localStorage:", e);
+      }
+    }
+    return new Set();
+  });
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Sync readIds to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("hatchmate_read_notifications", JSON.stringify(Array.from(readIds)));
+      } catch (e) {
+        console.error("Error saving readIds to localStorage:", e);
+      }
+    }
+  }, [readIds]);
+
   const handleNotifClick = (notif: NotifItem) => {
-    // 1. Mark as read
+    // Mark as read (hide red dot, reduce unread count) without navigating away
     setReadIds((prev) => new Set([...prev, notif.id]));
+  };
 
-    // 2. Remove notification from list
-    setNotifs((prev) => prev.filter((n) => n.id !== notif.id));
-
-    // 3. Close panel if empty
-    if (notifs.length <= 1) {
-      setOpen(false);
-    }
-
-    // 4. Navigate based on notification type
-    if (notif.type === "new_user") {
-      router.push("/users");
-    } else if (notif.type === "warning" || notif.type === "offline" || notif.type === "new_device") {
-      router.push("/devices");
-    }
+  const handleDismissNotif = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    // Explicitly delete notification item when X button is clicked
+    setNotifs((prev) => prev.filter((n) => n.id !== id));
   };
 
   // ── 1. Device alerts + new device detection ──
@@ -355,12 +367,9 @@ export default function NotificationBell() {
                       </span>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleNotifClick(notif);
-                        }}
+                        onClick={(e) => handleDismissNotif(e, notif.id)}
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-slate-400 hover:text-rose-500 rounded"
-                        title="Đã đọc & xóa thông báo"
+                        title="Xóa thông báo"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
