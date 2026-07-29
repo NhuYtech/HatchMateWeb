@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import StatCard from "@/src/components/dashboard/StatCard";
 import AiDetectionDonutChart from "@/src/components/dashboard/AiDetectionDonutChart";
 import IncubationStageBarChart from "@/src/components/dashboard/IncubationStageBarChart";
+import DeviceAlertOfflineBarChart from "@/src/components/reports/DeviceAlertOfflineBarChart";
 import ReportSummaryTable from "@/src/components/reports/ReportSummaryTable";
 import ReportExportCard from "@/src/components/reports/ReportExportCard";
 import type { ReportSummaryItem } from "@/src/types/report";
@@ -173,7 +174,7 @@ export default function ReportsPage() {
 
   const onlineCount = devices.filter((d) => d.status === "online").length;
   const warningCount = devices.filter((d) => d.status === "warning").length;
-  const totalEggCount = devices.reduce((sum, d) => sum + (d.eggCount ?? 24), 0) || 24;
+  const offlineCount = devices.filter((d) => d.status === "offline").length;
 
   const reportSummaryList: ReportSummaryItem[] = devices.map((d) => ({
     deviceId: d.id,
@@ -210,12 +211,22 @@ export default function ReportsPage() {
         <IncubationStageBarChart />
       </section>
 
-      {/* HÀNG 3: Tổng hợp hiệu suất & Xuất báo cáo */}
+      {/* HÀNG 2: Tổng hợp hiệu suất & Xuất báo cáo */}
       <section className="flex flex-col lg:flex-row gap-6 lg:items-start w-full min-w-0">
         <div className="w-full min-w-0 flex-1">
           <ReportSummaryTable items={reportSummaryList} />
         </div>
         <ReportExportCard items={reportSummaryList} stats={reportStats} />
+      </section>
+
+      {/* HÀNG 3: Biểu đồ Cột Thống kê Cảnh báo & Mất kết nối Máy ấp */}
+      <section className="w-full">
+        <DeviceAlertOfflineBarChart
+          devices={devices}
+          onlineCount={onlineCount}
+          warningCount={warningCount}
+          offlineCount={offlineCount}
+        />
       </section>
     </div>
   );

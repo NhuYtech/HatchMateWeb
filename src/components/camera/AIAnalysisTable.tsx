@@ -8,10 +8,12 @@ import {
   MoreVertical, 
   Brain, 
   Download,
-  X
+  X,
+  Sparkles
 } from "lucide-react";
 import { AiRecord } from "@/src/types/camera";
 import DataTablePagination from "@/src/components/common/DataTablePagination";
+import { analyzeImageWithAi } from "@/src/lib/aiDetection";
 
 interface AIAnalysisTableProps {
   records: AiRecord[];
@@ -43,6 +45,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
   const [pageSize, setPageSize] = useState(10);
   const [previewRecord, setPreviewRecord] = useState<AiRecord | null>(null);
   const [previewOriginalUrl, setPreviewOriginalUrl] = useState<string | null>(null);
+  const [isAnalyzingRecord, setIsAnalyzingRecord] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on click outside
@@ -115,7 +118,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
       case "normal":
         return <span className="font-semibold text-emerald-700 text-xs">Bình thường</span>;
       case "warning":
-        return <span className="font-semibold text-amber-700 text-xs">Cảnh báo</span>;
+        return <span className="font-semibold text-rose-600 text-xs">Cảnh báo</span>;
       case "danger":
         return <span className="font-semibold text-rose-700 text-xs animate-pulse">Nguy hiểm</span>;
       default:
@@ -213,10 +216,13 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
             {paginatedRecords.map((record, index) => {
               const isManual = record.resultStatus === "manual" || 
                                (record.resultTitle && (record.resultTitle.includes("THỦ CÔNG") || record.resultTitle.includes("NGƯỜI DÙNG")));
-              
+              const isNoEgg = Boolean(record.imageUrl?.includes("no_egg") || (record.resultTitle && record.resultTitle.includes("KHÔNG TÌM THẤY TRỨNG")));
+
               let displaySummary = record.resultSummary;
               if (isManual) {
                 displaySummary = "Ảnh chụp từ ứng dụng/Web, chưa qua phân tích AI";
+              } else if (isNoEgg) {
+                displaySummary = "AI nhận diện: 0 quả trứng (Không tìm thấy trứng trong buồng ấp)";
               } else {
                 const titleMatch = record.resultTitle?.match(/(\d+)\s*quả/i);
                 if (titleMatch && displaySummary && displaySummary.includes("24 quả") && titleMatch[1] !== "24") {
@@ -278,7 +284,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
 
                   {/* Độ tin cậy */}
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {!isManual && record.confidence !== undefined && record.confidence !== null && record.confidence > 0 ? (
+                    {!isManual && !isNoEgg && record.confidence !== undefined && record.confidence !== null && record.confidence > 0 ? (
                       <span className="font-semibold text-slate-800 text-xs">
                         {record.confidence}%
                       </span>
@@ -423,6 +429,49 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                 <span>Mô hình: <strong>{previewRecord.processedBy}</strong></span>
               </div>
             </div>
+
+            {/* NÚT AI NHẬN DIỆN TRỨNG TRÊN WEB */}
+            <button
+              type="button"
+              onClick={async () => {
+                if (!previewRecord || !previewRecord.imageUrl) return;
+                setIsAnalyzingRecord(true);
+                try {
+                  const result = await analyzeImageWithAi(previewRecord.imageUrl, previewRecord.deviceId);
+
+                  if (result.success) {
+                    if (result.detectedCount === 0) {
+                      setPreviewRecord({
+                        ...previewRecord,
+                        resultStatus: "warning",
+                        resultTitle: "KHÔNG TÌM THẤY TRỨNG",
+                        resultSummary: "AI nhận diện: 0 quả trứng (Không tìm thấy trứng trong buồng ấp)",
+                        confidence: null,
+                        imageUrl: result.processedImageUrl || previewRecord.imageUrl,
+                      });
+                    } else {
+                      setPreviewRecord({
+                        ...previewRecord,
+                        resultStatus: "normal",
+                        resultTitle: "Số lượng ổn định",
+                        resultSummary: `AI nhận diện thành công: ${result.detectedCount} quả trứng`,
+                        confidence: result.confidence,
+                        imageUrl: result.processedImageUrl || previewRecord.imageUrl,
+                      });
+                    }
+                  } else {
+                    alert(result.message || "Kết nối AI thất bại!");
+                  }
+                } finally {
+                  setIsAnalyzingRecord(false);
+                }
+              }}
+              disabled={isAnalyzingRecord}
+              className="w-full h-12 rounded-[20px] bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 active:scale-[0.98] transition duration-150 cursor-pointer border border-amber-400/40 disabled:opacity-75 disabled:cursor-not-allowed mt-1"
+            >
+              <Sparkles className={`h-4.5 w-4.5 text-amber-100 ${isAnalyzingRecord ? "animate-spin" : ""}`} />
+              <span>{isAnalyzingRecord ? "ĐANG PHÂN TÍCH AI..." : "✨ AI NHẬN DIỆN TRỨNG"}</span>
+            </button>
           </div>
         </div>,
         document.body

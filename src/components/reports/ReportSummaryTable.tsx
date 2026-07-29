@@ -43,20 +43,9 @@ export default function ReportSummaryTable({ items }: ReportSummaryTableProps) {
   const paginatedItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const getAlertBadge = (count: number) => {
-    if (count === 0) {
-      return (
-        <span className="text-xs font-bold text-emerald-600">
-          0 cảnh báo
-        </span>
-      );
-    }
-    const color = count > 5 
-      ? "text-rose-600" 
-      : "text-amber-600";
-
     return (
-      <span className={`text-xs font-bold ${color}`}>
-        {count} sự cố
+      <span className="text-xs font-bold text-rose-600">
+        {count} cảnh báo
       </span>
     );
   };

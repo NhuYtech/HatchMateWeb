@@ -9,6 +9,8 @@ import { auth, db, rtdb } from "@/src/lib/firebase";
 import { Cpu, Activity, Sparkles, Users } from "lucide-react";
 import type { DeviceItem, KpiSummary } from "@/src/types/dashboard";
 
+import MonthlyMetricsBarChart from "@/src/components/dashboard/MonthlyMetricsBarChart";
+
 const initialKpi: KpiSummary = {
   totalDevices: 0,
   onlineDevices: 0,
@@ -23,6 +25,8 @@ export default function DashboardPage() {
   const [devices, setDevices] = useState<DeviceItem[]>([]);
   const [kpi, setKpi] = useState<KpiSummary>(initialKpi);
   const [userCount, setUserCount] = useState<number>(6);
+  const [rawUsers, setRawUsers] = useState<any[]>([]);
+  const [rawIncubators, setRawIncubators] = useState<any[]>([]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -31,6 +35,11 @@ export default function DashboardPage() {
         try {
           const usersCol = collection(db, "users");
           const querySnapshot = await getDocs(usersCol);
+          const uList: any[] = [];
+          querySnapshot.forEach((doc) => {
+            uList.push({ id: doc.id, ...doc.data() });
+          });
+          setRawUsers(uList);
           if (querySnapshot.size > 0) {
             setUserCount(querySnapshot.size);
           }
@@ -50,12 +59,14 @@ export default function DashboardPage() {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const list: DeviceItem[] = [];
+        const incList: any[] = [];
 
         Object.keys(data).forEach((key) => {
           const lowerKey = key.trim().toLowerCase();
           if (lowerKey === "matg02" || lowerKey === "mayap01" || lowerKey === "mayap02") return;
           const item = data[key];
           if (typeof item === "object" && item !== null) {
+            incList.push({ id: key, ...item });
             const temperature = Number(item.telemetry?.temp ?? item.temperature ?? 0);
             const humidity = Number(item.telemetry?.humi ?? item.humidity ?? 0);
             const incubatingDay = Number(item.telemetry?.day ?? item.incubatingDay ?? 0);
@@ -79,6 +90,7 @@ export default function DashboardPage() {
         });
 
         setDevices(list);
+        setRawIncubators(incList);
 
         const total = list.length;
         const online = list.filter((d) => d.status === "online").length;
@@ -110,6 +122,7 @@ export default function DashboardPage() {
 
   const onlineCount = devices.filter((d) => d.status === "online").length;
   const totalEggCount = devices.reduce((sum, d) => sum + (d.eggCount ?? 24), 0) || 24;
+  const cameraCount = devices.filter((d) => d.hasCamera).length || 1;
 
   return (
     <div className="grid gap-6">
@@ -145,6 +158,17 @@ export default function DashboardPage() {
           description="Tài khoản truy cập hệ thống"
           accent="users"
           icon={<Users className="h-5 w-5 text-sky-600" />}
+        />
+      </section>
+
+      {/* Biểu đồ Cột Thống kê 1 tháng: Người dùng, Máy ấp, Camera */}
+      <section className="w-full">
+        <MonthlyMetricsBarChart
+          userCount={userCount}
+          deviceCount={kpi.totalDevices}
+          cameraCount={cameraCount}
+          rawUsers={rawUsers}
+          rawIncubators={rawIncubators}
         />
       </section>
     </div>

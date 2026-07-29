@@ -87,23 +87,6 @@ export default function CameraPage() {
                 lostEggCount,
               });
 
-              activeAiRecords.push({
-                id: `ai-${key}`,
-                cameraId: `cam-${key}`,
-                deviceId: key,
-                deviceName: deviceName,
-                capturedAt: lastSeen,
-                imageUrl: item.camera?.previewImage ?? null,
-                resultStatus: isEggLost ? "danger" : "normal",
-                resultTitle: isEggLost ? "CẢNH BÁO MẤT TRỨNG" : "Số lượng ổn định",
-                resultSummary: isEggLost 
-                  ? `Phát hiện sụt giảm trứng từ ${initialEggCount} xuống ${eggCount} quả (Mất ${lostEggCount} quả)` 
-                  : `AI nhận diện thành công: ${eggCount} quả trứng, giữ nguyên mốc ban đầu ${initialEggCount} quả`,
-                confidence: item.camera?.confidence !== undefined ? Math.round(Number(item.camera.confidence) * 100) : 98,
-                processedBy: "HatchMate YOLOv8 AI",
-                notes: null,
-              });
-
               // Parse AI events and captured photos list synced from Mobile App & Web
               if (item.ai_events && typeof item.ai_events === "object") {
                 Object.keys(item.ai_events).forEach((evKey) => {
@@ -112,17 +95,28 @@ export default function CameraPage() {
                     const isManualEvent = ev.type === "manual" || 
                                          (ev.title && (String(ev.title).includes("THỦ CÔNG") || String(ev.title).includes("NGƯỜI DÙNG")));
 
-                    const titleMatch = ev.title ? String(ev.title).match(/(\d+)\s*quả/i) : null;
-                    const evEggCount = ev.detectedLabel !== undefined 
-                      ? Number(ev.detectedLabel) 
-                      : (ev.eggCount !== undefined 
-                          ? Number(ev.eggCount) 
-                          : (titleMatch ? Number(titleMatch[1]) : eggCount));
+                    const evImgUrl = ev.imageUrl || ev.image || item.camera?.previewImage || "";
+                    const isNoEggImage = evImgUrl.includes("no_egg");
 
-                    const evIsLost = evEggCount < initialEggCount && initialEggCount > 0;
+                    const titleMatch = ev.title ? String(ev.title).match(/(\d+)\s*quả/i) : null;
+                    
+                    let evEggCount: number = 0;
+                    if (isNoEggImage) {
+                      evEggCount = 0;
+                    } else if (ev.detectedLabel !== undefined && ev.detectedLabel !== null) {
+                      evEggCount = Number(ev.detectedLabel);
+                    } else if (ev.eggCount !== undefined && ev.eggCount !== null) {
+                      evEggCount = Number(ev.eggCount);
+                    } else if (titleMatch) {
+                      evEggCount = Number(titleMatch[1]);
+                    } else {
+                      evEggCount = 0;
+                    }
+
+                    const evIsLost = evEggCount < initialEggCount && initialEggCount > 0 && !isNoEggImage;
                     
                     let parsedConfidence: number | null = null;
-                    if (!isManualEvent) {
+                    if (!isManualEvent && !isNoEggImage) {
                       if (ev.confidence !== undefined && ev.confidence !== null && Number(ev.confidence) > 0) {
                         const c = Number(ev.confidence);
                         parsedConfidence = c <= 1 ? Math.round(c * 100) : Math.round(c);
@@ -134,20 +128,27 @@ export default function CameraPage() {
                       }
                     }
 
+                    let summaryText = "";
+                    if (isManualEvent) {
+                      summaryText = "Ảnh chụp từ ứng dụng/Web, chưa qua phân tích AI";
+                    } else if (isNoEggImage || evEggCount === 0) {
+                      summaryText = "AI nhận diện: 0 quả trứng (Không tìm thấy trứng trong buồng ấp)";
+                    } else if (evIsLost) {
+                      summaryText = `Phát hiện sụt giảm trứng: Ban đầu ${initialEggCount} quả, hiện còn ${evEggCount} quả (Mất ${initialEggCount - evEggCount} quả)`;
+                    } else {
+                      summaryText = `AI nhận diện thành công: ${evEggCount} quả trứng`;
+                    }
+
                     activeAiRecords.unshift({
                       id: `ai-event-${evKey}`,
                       cameraId: `cam-${key}`,
                       deviceId: key,
                       deviceName: deviceName,
                       capturedAt: ev.time || ev.timestamp || lastSeen,
-                      imageUrl: ev.imageUrl || ev.image || item.camera?.previewImage || null,
-                      resultStatus: isManualEvent ? "manual" : (evIsLost ? "danger" : "normal"),
-                      resultTitle: ev.title || (isManualEvent ? "ẢNH CHỤP THỦ CÔNG (NGƯỜI DÙNG)" : (evIsLost ? "CẢNH BÁO MẤT TRỨNG" : "Số lượng ổn định")),
-                      resultSummary: isManualEvent 
-                        ? "Ảnh chụp từ ứng dụng/Web, chưa qua phân tích AI" 
-                        : (evIsLost 
-                            ? `Phát hiện sụt giảm trứng: Ban đầu ${initialEggCount} quả, hiện còn ${evEggCount} quả (Mất ${initialEggCount - evEggCount} quả)` 
-                            : `AI nhận diện thành công: ${evEggCount} quả trứng`),
+                      imageUrl: evImgUrl || null,
+                      resultStatus: isManualEvent ? "manual" : (isNoEggImage || evEggCount === 0 ? "warning" : (evIsLost ? "danger" : "normal")),
+                      resultTitle: ev.title || (isManualEvent ? "ẢNH CHỤP THỦ CÔNG (NGƯỜI DÙNG)" : (isNoEggImage || evEggCount === 0 ? "KHÔNG TÌM THẤY TRỨNG" : (evIsLost ? "CẢNH BÁO MẤT TRỨNG" : "Số lượng ổn định"))),
+                      resultSummary: summaryText,
                       confidence: parsedConfidence,
                       processedBy: isManualEvent ? "Chụp thủ công từ ứng dụng" : (ev.processedBy || "HatchMate YOLOv8 AI"),
                       notes: null,
@@ -173,80 +174,28 @@ export default function CameraPage() {
 
         let total = activeCameras.length;
         let onlineCount = activeCameras.filter((c) => c.status === "online").length;
-        let analyzed = activeAiRecords.length > 0 ? activeAiRecords.length : (onlineCount > 0 ? onlineCount * 5 + 18 : 0);
+        let analyzed = activeAiRecords.length;
         let alerts = activeCameras.filter((c) => c.isEggLost).length;
-
-        // Dev fallback: show mock MATG01 camera when no real cameras in DB
-        if (activeCameras.length === 0) {
-          const mockCamera: CameraItem = {
-            id: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
-            cameraName: "Cam MATG01 (Chạy thử)", locationLabel: "Trạm ấp",
-            status: "online", previewImage: "/incubator_eggs.png",
-            streamUrl: "http://192.168.88.220:81/stream",
-            ipAddress: "192.168.88.220:81",
-            lastCaptureAt: new Date().toLocaleTimeString("vi-VN"),
-            aiStatus: "analyzed", aiAlertCount: 0,
-            lastAiSummary: "Số lượng trứng ổn định: 24/24 quả",
-            lastAiConfidence: 94, streamEnabled: true, eggCount: 24, previousEggCount: 24, initialEggCount: 24
-          };
-          activeCameras.push(mockCamera);
-          activeAiRecords.push({
-            id: "ai-MATG01", cameraId: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
-            capturedAt: new Date().toLocaleTimeString("vi-VN"), imageUrl: "/incubator_eggs.png",
-            resultStatus: "normal", resultTitle: "Số lượng ổn định",
-            resultSummary: "AI nhận diện thành công: 24 quả trứng, không có thay đổi",
-            confidence: 94, processedBy: "HatchMate AI v1.0", notes: null
-          });
-          activePhotos.push({
-            id: "photo-MATG01-1",
-            title: "Ảnh chụp thủ công (Người dùng)",
-            time: new Date().toLocaleTimeString("vi-VN"),
-            imageUrl: "/incubator_eggs.png",
-            type: "manual",
-            deviceName: "MATG01",
-          });
-          total = 1; analyzed = 24; alerts = 0;
-        }
 
         setCameras(activeCameras);
         setAiRecords(activeAiRecords);
         setPhotoRecords(activePhotos);
         setStats({
           totalCameras: total,
-          totalCapturedImages: activePhotos.length > 0 ? activePhotos.length : 46,
+          totalCapturedImages: activePhotos.length,
           analyzedImages: analyzed,
           variationAlerts: alerts,
         });
       } else {
-        // Fallback khi RTDB node trống
-        const mockCamera: CameraItem = {
-          id: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
-          cameraName: "Cam MATG01 (Chạy thử)", locationLabel: "",
-          status: "online", previewImage: "/incubator_eggs.png",
-          streamUrl: "http://192.168.88.220:81/stream",
-          ipAddress: "192.168.88.220:81",
-          lastCaptureAt: new Date().toLocaleTimeString("vi-VN"),
-          aiStatus: "analyzed", aiAlertCount: 0,
-          lastAiSummary: "Số lượng trứng ổn định: 24/24 quả",
-          lastAiConfidence: 94, streamEnabled: true, eggCount: 24, previousEggCount: 24, initialEggCount: 24
-        };
-        setCameras([mockCamera]);
-        setAiRecords([{
-          id: "ai-MATG01", cameraId: "cam-MATG01", deviceId: "MATG01", deviceName: "MATG01",
-          capturedAt: new Date().toLocaleTimeString("vi-VN"), imageUrl: "/incubator_eggs.png",
-          resultStatus: "normal", resultTitle: "Số lượng ổn định",
-          resultSummary: "AI nhận diện thành công: 24 quả trứng, không có thay đổi",
-          confidence: 94, processedBy: "HatchMate AI v1.0", notes: null
-        }]);
-        setPhotoRecords([{
-          id: "photo-MATG01-1",
-          title: "Ảnh chụp thủ công (Người dùng)",
-          time: new Date().toLocaleTimeString("vi-VN"),
-          imageUrl: "/incubator_eggs.png",
-          type: "manual",
-          deviceName: "MATG01",
-        }]);
-        setStats({ totalCameras: 1, totalCapturedImages: 46, analyzedImages: 47, variationAlerts: 0 });
+        setCameras([]);
+        setAiRecords([]);
+        setPhotoRecords([]);
+        setStats({
+          totalCameras: 0,
+          totalCapturedImages: 0,
+          analyzedImages: 0,
+          variationAlerts: 0,
+        });
       }
       setLoading(false);
     }, (err) => {

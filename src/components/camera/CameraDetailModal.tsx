@@ -13,8 +13,11 @@ import {
   ImageOff,
   ShieldCheck,
   AlertTriangle,
-  Clock
+  Clock,
+  Sparkles
 } from "lucide-react";
+
+import { analyzeImageWithAi } from "@/src/lib/aiDetection";
 
 interface CameraDetailModalProps {
   isOpen: boolean;
@@ -41,6 +44,51 @@ export default function CameraDetailModal({
   const [events, setEvents] = useState<EventItem[]>([]);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const handleRunAiDetection = async () => {
+    const targetUrl = selectedImageUrl || camera.previewImage;
+    if (!targetUrl) {
+      showToast("Không tìm thấy ảnh để nhận diện!");
+      return;
+    }
+    setIsAnalyzing(true);
+    try {
+      const result = await analyzeImageWithAi(targetUrl, deviceId);
+
+      if (result.success) {
+        if (result.detectedCount === 0) {
+          setCamera(prev => ({
+            ...prev,
+            eggCount: 0,
+            lastAiSummary: "AI nhận diện: 0 quả trứng (Không tìm thấy trứng trong buồng ấp)",
+            lastAiConfidence: null,
+            aiStatus: "alert",
+          }));
+          showToast("✨ AI nhận diện xong: Không tìm thấy quả trứng nào!");
+        } else {
+          setCamera(prev => ({
+            ...prev,
+            eggCount: result.detectedCount,
+            lastAiSummary: `AI nhận diện thành công: ${result.detectedCount} quả trứng`,
+            lastAiConfidence: result.confidence,
+            aiStatus: "analyzed",
+            previewImage: result.processedImageUrl || prev.previewImage,
+          }));
+          if (result.processedImageUrl) {
+            setSelectedImageUrl(result.processedImageUrl);
+          }
+          showToast(`✨ AI nhận diện thành công: ${result.detectedCount} quả trứng ${result.confidence ? `(${result.confidence}% độ tin cậy)` : ""}`);
+        }
+      } else {
+        showToast(result.message || "Kết nối AI thất bại!");
+      }
+    } catch (err) {
+      showToast("Phân tích AI thất bại, vui lòng thử lại!");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   // Sync with Firebase RTDB & Firestore
   useEffect(() => {
@@ -210,6 +258,17 @@ export default function CameraDetailModal({
             </div>
           )}
         </div>
+
+        {/* NÚT AI NHẬN DIỆN TRỨNG (Giống hệt Mobile App) */}
+        <button
+          type="button"
+          onClick={handleRunAiDetection}
+          disabled={isAnalyzing}
+          className="w-full h-12 rounded-[22px] bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 active:scale-[0.98] transition duration-150 cursor-pointer border border-amber-400/40 disabled:opacity-75 disabled:cursor-not-allowed"
+        >
+          <Sparkles className={`h-4.5 w-4.5 text-amber-100 ${isAnalyzing ? "animate-spin" : ""}`} />
+          <span>{isAnalyzing ? "ĐANG PHÂN TÍCH AI..." : "✨ AI NHẬN DIỆN TRỨNG"}</span>
+        </button>
 
         {/* 2. AI Details Panel */}
         <div className="bg-white border border-[#FBEBE3] rounded-[28px] p-5 shadow-sm flex flex-col gap-3.5">

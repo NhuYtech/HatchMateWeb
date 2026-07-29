@@ -20,7 +20,7 @@ export interface CameraItem {
   aiStatus: CameraAiStatus;
   aiAlertCount: number;
   lastAiSummary: string;
-  lastAiConfidence?: number;
+  lastAiConfidence?: number | null;
   streamEnabled: boolean;
   eggCount?: number;
   previousEggCount?: number;
