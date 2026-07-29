@@ -153,7 +153,7 @@ export default function DevicesPage() {
 
     // Clean up old RTDB mock nodes MATG02 and MayAp01 if present in Realtime DB
     ["MATG02", "MayAp01", "MayAp02"].forEach((mockKey) => {
-      remove(ref(rtdb, `incubators/${mockKey}`)).catch(() => {});
+      remove(ref(rtdb, `incubators/${mockKey}`)).catch(() => { });
     });
 
     const unsubscribe = onValue(devicesRef, (snapshot) => {
@@ -222,7 +222,7 @@ export default function DevicesPage() {
       {/* Mini Stats Component Section */}
       <section className="grid gap-4 sm:grid-cols-3">
         <DeviceMiniStatCard
-          label="Tổng số thiết bị"
+          label="Tổng số máy ấp"
           value={total}
           icon={Cpu}
           accent="indigo"

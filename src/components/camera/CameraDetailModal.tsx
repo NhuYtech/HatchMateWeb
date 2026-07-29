@@ -249,14 +249,18 @@ export default function CameraDetailModal({
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[10px] font-bold">
                   <span className="text-slate-400">ĐỘ TIN CẬY (CONFIDENCE):</span>
-                  <span className="text-sky-950 font-mono">{camera.lastAiConfidence}%</span>
+                  <span className="text-sky-950 font-mono">
+                    {camera.lastAiConfidence && camera.lastAiConfidence > 0 ? `${camera.lastAiConfidence}%` : "Không có"}
+                  </span>
                 </div>
-                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-500 ${camera.aiStatus === "alert" ? "bg-rose-500" : "bg-sky-600"}`} 
-                    style={{ width: `${camera.lastAiConfidence}%` }}
-                  />
-                </div>
+                {camera.lastAiConfidence && camera.lastAiConfidence > 0 ? (
+                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${camera.aiStatus === "alert" ? "bg-rose-500" : "bg-sky-600"}`} 
+                      style={{ width: `${camera.lastAiConfidence}%` }}
+                    />
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

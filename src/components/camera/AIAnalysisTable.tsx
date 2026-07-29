@@ -403,12 +403,23 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500">KẾT QUẢ CHẨN ĐOÁN:</span>
-                {getStatusText(previewRecord.resultStatus)}
+                {getStatusText(previewRecord.resultStatus, previewRecord.resultTitle)}
               </div>
               <p className="text-sm font-bold text-sky-950 uppercase tracking-wide">{previewRecord.resultTitle}</p>
               <p className="text-xs font-semibold text-slate-600 leading-relaxed">{previewRecord.resultSummary}</p>
               <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-slate-500">
-                <span>Độ tin cậy: <strong className="text-sky-700">{previewRecord.confidence}%</strong></span>
+                <span>
+                  Độ tin cậy:{" "}
+                  <strong className="text-sky-700">
+                    {previewRecord.resultStatus !== "manual" &&
+                    !(previewRecord.resultTitle && (previewRecord.resultTitle.includes("THỦ CÔNG") || previewRecord.resultTitle.includes("NGƯỜI DÙNG"))) &&
+                    previewRecord.confidence !== undefined &&
+                    previewRecord.confidence !== null &&
+                    previewRecord.confidence > 0
+                      ? `${previewRecord.confidence}%`
+                      : "Không có"}
+                  </strong>
+                </span>
                 <span>Mô hình: <strong>{previewRecord.processedBy}</strong></span>
               </div>
             </div>

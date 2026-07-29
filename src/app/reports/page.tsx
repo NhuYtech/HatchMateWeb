@@ -204,39 +204,7 @@ export default function ReportsPage() {
         </p>
       </div>
 
-      {/* HÀNG 1: 4 Thẻ KPI */}
-      <section className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Tổng số thiết bị"
-          value={`${kpi.totalDevices}`}
-          description="Tổng số trạm ấp đang quản lý"
-          accent="default"
-          icon={<Cpu className="h-5 w-5 text-indigo-600" />}
-        />
-        <StatCard
-          label="Thiết bị online"
-          value={`${onlineCount}`}
-          description="Kết nối hoạt động ổn định"
-          accent="success"
-          icon={<Activity className="h-5 w-5 text-emerald-600" />}
-        />
-        <StatCard
-          label="Nhận diện từ AI"
-          value={`${totalEggCount}`}
-          description="Đếm tự động từ Camera"
-          accent="temperature"
-          icon={<Sparkles className="h-5 w-5 text-amber-600" />}
-        />
-        <StatCard
-          label="Người dùng"
-          value={`${userCount}`}
-          description="Tài khoản truy cập hệ thống"
-          accent="default"
-          icon={<Users className="h-5 w-5 text-sky-600" />}
-        />
-      </section>
-
-      {/* HÀNG 2: Biểu đồ Vòng AI & Biểu đồ Cột Thông số Ấp 3 Giai đoạn */}
+      {/* HÀNG 1: Biểu đồ Vòng AI & Biểu đồ Cột Thông số Ấp 3 Giai đoạn */}
       <section className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         <AiDetectionDonutChart />
         <IncubationStageBarChart />

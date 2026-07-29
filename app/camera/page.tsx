@@ -123,11 +123,14 @@ export default function CameraPage() {
                     
                     let parsedConfidence: number | null = null;
                     if (!isManualEvent) {
-                      if (ev.confidence !== undefined && ev.confidence !== null) {
+                      if (ev.confidence !== undefined && ev.confidence !== null && Number(ev.confidence) > 0) {
                         const c = Number(ev.confidence);
                         parsedConfidence = c <= 1 ? Math.round(c * 100) : Math.round(c);
                       } else if (ev.type === "ai" || titleMatch) {
-                        parsedConfidence = 95;
+                        if (item.camera?.confidence !== undefined && item.camera?.confidence !== null && Number(item.camera.confidence) > 0) {
+                          const camConf = Number(item.camera.confidence);
+                          parsedConfidence = camConf <= 1 ? Math.round(camConf * 100) : Math.round(camConf);
+                        }
                       }
                     }
 

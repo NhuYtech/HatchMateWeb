@@ -4,7 +4,7 @@ interface StatCardProps {
   label: string;
   value: string;
   description: string;
-  accent: "temperature" | "humidity" | "success" | "warning" | "danger" | "default";
+  accent: "temperature" | "humidity" | "success" | "warning" | "danger" | "default" | "users";
   icon: ReactNode;
   footnote?: string;
 }
@@ -16,6 +16,7 @@ const accentStyles: Record<StatCardProps["accent"], string> = {
   warning: "border-amber-100 bg-gradient-to-br from-amber-50 via-white to-amber-100 text-amber-900",
   danger: "border-rose-100 bg-gradient-to-br from-rose-50 via-white to-rose-100 text-rose-900",
   default: "border-indigo-100 bg-white text-slate-900",
+  users: "border-sky-100 bg-white text-slate-900",
 };
 
 export default function StatCard({ label, value, description, accent, icon, footnote }: StatCardProps) {
@@ -64,6 +65,23 @@ export default function StatCard({ label, value, description, accent, icon, foot
               radial-gradient(
                 circle at top left,
                 rgba(255, 140, 60, 0.45),
+                transparent 70%
+              )
+            `,
+            filter: "blur(40px)",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
+      )}
+      {accent === "users" && (
+        <div
+          className="absolute inset-0 z-0"
+          style={{
+            background: "#ffffff",
+            backgroundImage: `
+              radial-gradient(
+                circle at top left,
+                rgba(70, 130, 180, 0.5),
                 transparent 70%
               )
             `,
