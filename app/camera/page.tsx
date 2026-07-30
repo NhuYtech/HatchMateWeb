@@ -147,7 +147,7 @@ export default function CameraPage() {
                       capturedAt: ev.time || ev.timestamp || lastSeen,
                       imageUrl: evImgUrl || null,
                       resultStatus: isManualEvent ? "manual" : (isNoEggImage || evEggCount === 0 ? "warning" : (evIsLost ? "danger" : "normal")),
-                      resultTitle: ev.title || (isManualEvent ? "ẢNH CHỤP THỦ CÔNG (NGƯỜI DÙNG)" : (isNoEggImage || evEggCount === 0 ? "KHÔNG TÌM THẤY TRỨNG" : (evIsLost ? "CẢNH BÁO MẤT TRỨNG" : "Số lượng ổn định"))),
+                      resultTitle: ev.title || (isManualEvent ? "ẢNH CHỤP THỦ CÔNG (NGƯỜI DÙNG)" : (isNoEggImage || evEggCount === 0 ? "KHÔNG TÌM THẤY TRỨNG" : (evIsLost ? "CẢNH BÁO MẤT TRỨNG" : (evEggCount > 0 ? `${evEggCount} quả trứng` : "Số lượng ổn định")))),
                       resultSummary: summaryText,
                       confidence: parsedConfidence,
                       processedBy: isManualEvent ? "Chụp thủ công từ ứng dụng" : (ev.processedBy || "HatchMate YOLOv8 AI"),
@@ -265,7 +265,14 @@ export default function CameraPage() {
       )}
 
       {/* 4. Lịch sử phân tích của AI */}
-      {!loading && aiRecords.length > 0 && <AIAnalysisTable records={aiRecords} />}
+      {!loading && aiRecords.length > 0 && (
+        <AIAnalysisTable 
+          records={aiRecords}
+          onDeleteRecord={(deletedId) => {
+            setAiRecords(prev => prev.filter(r => r.id !== deletedId));
+          }}
+        />
+      )}
     </div>
   );
 }

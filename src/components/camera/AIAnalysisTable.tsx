@@ -9,8 +9,13 @@ import {
   Brain, 
   Download,
   X,
-  Sparkles
+  Sparkles,
+  Trash2,
+  CheckCircle2
 } from "lucide-react";
+import { ref, remove, get, update } from "firebase/database";
+import { doc, deleteDoc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { rtdb, db } from "@/src/lib/firebase";
 import { AiRecord } from "@/src/types/camera";
 import DataTablePagination from "@/src/components/common/DataTablePagination";
 import { analyzeImageWithAi } from "@/src/lib/aiDetection";
@@ -18,6 +23,7 @@ import { analyzeImageWithAi } from "@/src/lib/aiDetection";
 interface AIAnalysisTableProps {
   records: AiRecord[];
   onRefresh?: () => void;
+  onDeleteRecord?: (recordId: string) => void;
 }
 
 function formatReadableDateTime(timeStr: string): string {
@@ -39,14 +45,106 @@ function formatReadableDateTime(timeStr: string): string {
   return timeStr;
 }
 
-export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableProps) {
-  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+export default function AIAnalysisTable({ records, onRefresh, onDeleteRecord }: AIAnalysisTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(10);
   const [previewRecord, setPreviewRecord] = useState<AiRecord | null>(null);
   const [previewOriginalUrl, setPreviewOriginalUrl] = useState<string | null>(null);
   const [isAnalyzingRecord, setIsAnalyzingRecord] = useState(false);
+  const [deletingRecord, setDeletingRecord] = useState<AiRecord | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleDeleteRecord = async (rec: AiRecord) => {
+    try {
+      const evKey = rec.id.replace(/^(ai-event-|photo-)/, "");
+
+      // 1. Xóa sự kiện khỏi Realtime Database ai_events
+      try {
+        const evRef = ref(rtdb, `incubators/${rec.deviceId}/ai_events/${evKey}`);
+        await remove(evRef);
+      } catch (e) {
+        console.warn("Lỗi khi xóa ai_event trên RTDB:", e);
+      }
+
+      // 2. Dọn dẹp nút camera trên RTDB nếu đang tham chiếu tới ảnh bị xóa
+      try {
+        const camRef = ref(rtdb, `incubators/${rec.deviceId}/camera`);
+        const camSnap = await get(camRef);
+        if (camSnap.exists()) {
+          const camData = camSnap.val();
+          const imgUrl = rec.imageUrl;
+
+          if (
+            !imgUrl ||
+            camData.previewImage === imgUrl ||
+            camData.url === imgUrl ||
+            camData.latestImageUrl === imgUrl ||
+            camData.aiImageUrl === imgUrl ||
+            camData.lastCaptureAt === rec.capturedAt
+          ) {
+            await update(camRef, {
+              previewImage: null,
+              url: null,
+              latestImageUrl: null,
+              aiImageUrl: null,
+              confidence: null,
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Lỗi khi cập nhật camera node trên RTDB:", e);
+      }
+
+      // 3. Xóa các document tương ứng trên Firestore camera_frames
+      try {
+        await deleteDoc(doc(db, "incubators", rec.deviceId, "camera_frames", rec.id));
+      } catch (e) {}
+
+      try {
+        await deleteDoc(doc(db, "incubators", rec.deviceId, "camera_frames", evKey));
+      } catch (e) {}
+
+      try {
+        await deleteDoc(doc(db, "incubators", rec.deviceId, "camera_frames", "latest_frame"));
+      } catch (e) {}
+
+      // 4. Cập nhật document camera/current trên Firestore (App Flutter đang lắng nghe)
+      try {
+        const cameraCurrentRef = doc(db, "camera", "current");
+        const docSnap = await getDoc(cameraCurrentRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const imgUrl = rec.imageUrl;
+          if (!imgUrl || data.latestImageUrl === imgUrl || data.aiImageUrl === imgUrl) {
+            await updateDoc(cameraCurrentRef, {
+              latestImageUrl: null,
+              aiImageUrl: null,
+              detectedLabel: null,
+              confidence: null,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Lỗi khi cập nhật doc camera/current trên Firestore:", e);
+      }
+
+      setToastMessage("Đã xóa hoàn toàn bản ghi ảnh khỏi cơ sở dữ liệu và ứng dụng!");
+      setTimeout(() => setToastMessage(null), 3000);
+      setDeletingRecord(null);
+
+      if (onDeleteRecord) {
+        onDeleteRecord(rec.id);
+      } else if (onRefresh) {
+        onRefresh();
+      }
+    } catch (err) {
+      console.error("Lỗi khi xóa bản ghi:", err);
+      alert("Xóa bản ghi thất bại, vui lòng thử lại!");
+    }
+  };
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -114,9 +212,17 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
     if (status === "manual" || (title && (title.includes("THỦ CÔNG") || title.includes("NGƯỜI DÙNG")))) {
       return <span className="font-semibold text-slate-400 text-xs italic">Chưa quét</span>;
     }
+    const countMatch = title?.match(/(\d+)\s*quả/i);
+    const countText = countMatch ? `${countMatch[1]} quả trứng` : "Bình thường";
+
     switch (status) {
       case "normal":
-        return <span className="font-semibold text-emerald-700 text-xs">Bình thường</span>;
+        return (
+          <span className="inline-flex items-center gap-1.5 font-bold text-sky-600 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200/80 text-xs shadow-2xs">
+            <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+            {countText}
+          </span>
+        );
       case "warning":
         return <span className="font-semibold text-rose-600 text-xs">Cảnh báo</span>;
       case "danger":
@@ -233,6 +339,8 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
               const rowSpan = rowSpans[index];
               const displayDeviceId = getDisplayDeviceId(record);
 
+              const isBottomRow = index >= paginatedRecords.length - 3;
+
               return (
                 <tr 
                   key={record.id} 
@@ -308,7 +416,7 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                   </td>
 
                 {/* Hành động */}
-                <td className="px-6 py-4 text-center">
+                <td className="px-6 py-4 text-center relative">
                   <div className="relative inline-block text-left">
                     <button
                       type="button"
@@ -322,7 +430,9 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                     {activeDropdownId === record.id && (
                       <div 
                         ref={dropdownRef}
-                        className="absolute right-0 top-full z-[100] mt-1 w-36 rounded-xl border border-sky-100 bg-white p-1.5 shadow-xl animate-in fade-in duration-100"
+                        className={`absolute right-0 ${
+                          isBottomRow ? "bottom-full mb-1" : "top-full mt-1"
+                        } z-[100] w-36 rounded-xl border border-sky-100 bg-white p-1.5 shadow-2xl animate-in fade-in duration-100`}
                       >
                         <button
                           type="button"
@@ -347,6 +457,17 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
                         >
                           <ImageIcon className="h-3.5 w-3.5 text-slate-500" />
                           <span>Xem ảnh gốc</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeletingRecord(record);
+                            setActiveDropdownId(null);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer border-t border-slate-100 mt-1 pt-1.5"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+                          <span>Xóa ảnh</span>
                         </button>
                       </div>
                     )}
@@ -430,48 +551,79 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
               </div>
             </div>
 
-            {/* NÚT AI NHẬN DIỆN TRỨNG TRÊN WEB */}
-            <button
-              type="button"
-              onClick={async () => {
-                if (!previewRecord || !previewRecord.imageUrl) return;
-                setIsAnalyzingRecord(true);
-                try {
-                  const result = await analyzeImageWithAi(previewRecord.imageUrl, previewRecord.deviceId);
+            {/* NÚT AI NHẬN DIỆN TRỨNG TRÊN WEB - CHỈ CHO PHÉP NHẤN 1 LẦN */}
+            {(() => {
+              const isAlreadyAnalyzed = Boolean(
+                (previewRecord.confidence !== undefined && previewRecord.confidence !== null && previewRecord.confidence > 0) ||
+                (previewRecord.resultStatus !== "manual" &&
+                 !(previewRecord.resultTitle && (previewRecord.resultTitle.includes("THỦ CÔNG") || previewRecord.resultTitle.includes("NGƯỜI DÙNG"))))
+              );
 
-                  if (result.success) {
-                    if (result.detectedCount === 0) {
-                      setPreviewRecord({
-                        ...previewRecord,
-                        resultStatus: "warning",
-                        resultTitle: "KHÔNG TÌM THẤY TRỨNG",
-                        resultSummary: "AI nhận diện: 0 quả trứng (Không tìm thấy trứng trong buồng ấp)",
-                        confidence: null,
-                        imageUrl: result.processedImageUrl || previewRecord.imageUrl,
-                      });
-                    } else {
-                      setPreviewRecord({
-                        ...previewRecord,
-                        resultStatus: "normal",
-                        resultTitle: "Số lượng ổn định",
-                        resultSummary: `AI nhận diện thành công: ${result.detectedCount} quả trứng`,
-                        confidence: result.confidence,
-                        imageUrl: result.processedImageUrl || previewRecord.imageUrl,
-                      });
+              return (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!previewRecord || !previewRecord.imageUrl || isAlreadyAnalyzed) return;
+                    setIsAnalyzingRecord(true);
+                    try {
+                      const rawTargetUrl = previewRecord.originalImageUrl || previewRecord.imageUrl;
+                      const result = await analyzeImageWithAi(rawTargetUrl, previewRecord.deviceId);
+
+                      if (result.success) {
+                        if (result.detectedCount === 0) {
+                          setPreviewRecord({
+                            ...previewRecord,
+                            resultStatus: "warning",
+                            resultTitle: "KHÔNG TÌM THẤY TRỨNG",
+                            resultSummary: "AI nhận diện: 0 quả trứng (Không tìm thấy trứng trong buồng ấp)",
+                            confidence: null,
+                            imageUrl: result.processedImageUrl || previewRecord.imageUrl,
+                            processedBy: "HatchMate YOLOv8 AI",
+                          });
+                        } else {
+                          setPreviewRecord({
+                            ...previewRecord,
+                            resultStatus: "normal",
+                            resultTitle: `${result.detectedCount} quả trứng`,
+                            resultSummary: `AI nhận diện thành công: ${result.detectedCount} quả trứng`,
+                            confidence: result.confidence,
+                            imageUrl: result.processedImageUrl || previewRecord.imageUrl,
+                            processedBy: "HatchMate YOLOv8 AI",
+                          });
+                        }
+                      } else {
+                        alert(result.message || "Kết nối AI thất bại!");
+                      }
+                    } finally {
+                      setIsAnalyzingRecord(false);
                     }
-                  } else {
-                    alert(result.message || "Kết nối AI thất bại!");
-                  }
-                } finally {
-                  setIsAnalyzingRecord(false);
-                }
-              }}
-              disabled={isAnalyzingRecord}
-              className="w-full h-12 rounded-[20px] bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 active:scale-[0.98] transition duration-150 cursor-pointer border border-amber-400/40 disabled:opacity-75 disabled:cursor-not-allowed mt-1"
-            >
-              <Sparkles className={`h-4.5 w-4.5 text-amber-100 ${isAnalyzingRecord ? "animate-spin" : ""}`} />
-              <span>{isAnalyzingRecord ? "ĐANG PHÂN TÍCH AI..." : "✨ AI NHẬN DIỆN TRỨNG"}</span>
-            </button>
+                  }}
+                  disabled={isAnalyzingRecord || isAlreadyAnalyzed}
+                  className={`w-full h-12 rounded-[20px] font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition duration-150 border mt-1 ${
+                    isAlreadyAnalyzed
+                      ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed shadow-none opacity-90"
+                      : "bg-[#E5A00D] hover:bg-[#D99308] text-white shadow-amber-500/25 active:scale-[0.98] cursor-pointer border-amber-400/40 disabled:opacity-75 disabled:cursor-not-allowed"
+                  }`}
+                >
+                  {isAlreadyAnalyzed ? (
+                    <>
+                      <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600" />
+                      <span>✓ ĐÃ PHÂN TÍCH AI ({previewRecord.resultTitle})</span>
+                    </>
+                  ) : isAnalyzingRecord ? (
+                    <>
+                      <Sparkles className="h-4.5 w-4.5 text-orange-100 animate-spin" />
+                      <span>ĐANG PHÂN TÍCH AI...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4.5 w-4.5 text-orange-100" />
+                      <span>AI NHẬN DIỆN TRỨNG</span>
+                    </>
+                  )}
+                </button>
+              );
+            })()}
           </div>
         </div>,
         document.body
@@ -501,6 +653,48 @@ export default function AIAnalysisTable({ records, onRefresh }: AIAnalysisTableP
               />
             </div>
           </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal 3: Xác nhận xóa bản ghi ảnh */}
+      {deletingRecord && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative max-w-sm w-full rounded-[28px] bg-white p-6 shadow-2xl border border-rose-100 flex flex-col gap-4 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+              <Trash2 className="h-6 w-6" />
+            </div>
+            <div>
+              <h4 className="text-base font-extrabold text-slate-900">Xóa bản ghi ảnh quét?</h4>
+              <p className="text-xs text-slate-500 font-medium mt-1">
+                Bạn có chắc chắn muốn xóa bản ghi ảnh quét AI này không? Thao tác này không thể hoàn tác.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingRecord(null)}
+                className="flex-1 h-10 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+              >
+                HỦY BỎ
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteRecord(deletingRecord)}
+                className="flex-1 h-10 rounded-xl bg-rose-600 hover:bg-rose-700 font-bold text-xs text-white shadow-sm transition cursor-pointer"
+              >
+                XÓA BẢN GHI
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && createPortal(
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] rounded-xl bg-slate-900/90 px-4 py-2 text-xs font-bold text-white shadow-xl backdrop-blur-sm border border-white/10 animate-in fade-in slide-in-from-top-4 duration-300">
+          {toastMessage}
         </div>,
         document.body
       )}

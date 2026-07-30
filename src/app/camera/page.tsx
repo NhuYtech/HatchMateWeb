@@ -6,9 +6,11 @@ import CameraMiniStatCard from "@/src/components/camera/CameraMiniStatCard";
 import CameraGrid from "@/src/components/camera/CameraGrid";
 import CameraTable from "@/src/components/camera/CameraTable";
 import AIAnalysisTable from "@/src/components/camera/AIAnalysisTable";
+import AppPhotoGalleryTable from "@/src/components/camera/AppPhotoGalleryTable";
 
-import { ref, onValue } from "firebase/database";
-import { rtdb } from "@/src/lib/firebase";
+import { ref, onValue, remove, get, update } from "firebase/database";
+import { doc, deleteDoc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { rtdb, db } from "@/src/lib/firebase";
 import { CameraItem, AiRecord, PhotoRecord } from "@/src/types/camera";
 import { 
   Video,
@@ -25,11 +27,81 @@ export default function CameraPage() {
   const [photoRecords, setPhotoRecords] = useState<PhotoRecord[]>([]);
   const [stats, setStats] = useState({
     totalCameras: 0,
-    totalCapturedImages: 46,
-    analyzedImages: 47,
+    totalCapturedImages: 0,
+    analyzedImages: 0,
     variationAlerts: 0,
   });
   const [loading, setLoading] = useState(true);
+
+  const handleDeletePhoto = async (photo: PhotoRecord) => {
+    try {
+      const deviceId = photo.deviceId || (photo.id ? photo.id.replace(/^(ai-event-|photo-)/, "") : "");
+      const evKey = photo.id.replace(/^(ai-event-|photo-)/, "");
+
+      // 1. RTDB ai_events
+      if (deviceId) {
+        try {
+          const evRef = ref(rtdb, `incubators/${deviceId}/ai_events/${evKey}`);
+          await remove(evRef);
+        } catch (e) {
+          console.warn("Lỗi khi xóa ai_event trên RTDB:", e);
+        }
+
+        // 2. RTDB camera node
+        try {
+          const camRef = ref(rtdb, `incubators/${deviceId}/camera`);
+          const camSnap = await get(camRef);
+          if (camSnap.exists()) {
+            const camData = camSnap.val();
+            const imgUrl = photo.imageUrl;
+            if (
+              !imgUrl ||
+              camData.previewImage === imgUrl ||
+              camData.url === imgUrl ||
+              camData.latestImageUrl === imgUrl ||
+              camData.aiImageUrl === imgUrl
+            ) {
+              await update(camRef, {
+                previewImage: null,
+                url: null,
+                latestImageUrl: null,
+                aiImageUrl: null,
+                confidence: null,
+              });
+            }
+          }
+        } catch (e) {}
+
+        // 3. Firestore camera_frames
+        try { await deleteDoc(doc(db, "incubators", deviceId, "camera_frames", photo.id)); } catch (e) {}
+        try { await deleteDoc(doc(db, "incubators", deviceId, "camera_frames", evKey)); } catch (e) {}
+        try { await deleteDoc(doc(db, "incubators", deviceId, "camera_frames", "latest_frame")); } catch (e) {}
+      }
+
+      // 4. Firestore camera/current
+      try {
+        const cameraCurrentRef = doc(db, "camera", "current");
+        const docSnap = await getDoc(cameraCurrentRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const imgUrl = photo.imageUrl;
+          if (!imgUrl || data.latestImageUrl === imgUrl || data.aiImageUrl === imgUrl) {
+            await updateDoc(cameraCurrentRef, {
+              latestImageUrl: null,
+              aiImageUrl: null,
+              detectedLabel: null,
+              confidence: null,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        }
+      } catch (e) {}
+
+      setPhotoRecords(prev => prev.filter(p => p.id !== photo.id));
+    } catch (err) {
+      console.error("Lỗi khi xóa ảnh:", err);
+    }
+  };
 
   useEffect(() => {
     const devicesRef = ref(rtdb, "incubators");
@@ -145,7 +217,7 @@ export default function CameraPage() {
                       capturedAt: ev.time || ev.timestamp || lastSeen,
                       imageUrl: evImgUrl || null,
                       resultStatus: isManualEvent ? "manual" : (isNoEggImage || evEggCount === 0 ? "warning" : (evIsLost ? "danger" : "normal")),
-                      resultTitle: ev.title || (isManualEvent ? "ẢNH CHỤP THỦ CÔNG (NGƯỜI DÙNG)" : (isNoEggImage || evEggCount === 0 ? "KHÔNG TÌM THẤY TRỨNG" : (evIsLost ? "CẢNH BÁO MẤT TRỨNG" : "Số lượng ổn định"))),
+                      resultTitle: ev.title || (isManualEvent ? "ẢNH CHỤP THỦ CÔNG (NGƯỜI DÙNG)" : (isNoEggImage || evEggCount === 0 ? "KHÔNG TÌM THẤY TRỨNG" : (evIsLost ? "CẢNH BÁO MẤT TRỨNG" : (evEggCount > 0 ? `${evEggCount} quả trứng` : "Số lượng ổn định")))),
                       resultSummary: summaryText,
                       confidence: parsedConfidence,
                       processedBy: isManualEvent ? "Chụp thủ công từ ứng dụng" : (ev.processedBy || "HatchMate YOLOv8 AI"),
@@ -155,6 +227,7 @@ export default function CameraPage() {
                     if (ev.imageUrl || ev.image) {
                       activePhotos.unshift({
                         id: `photo-${evKey}`,
+                        deviceId: key,
                         title: ev.title || "Ảnh chụp từ ứng dụng",
                         time: ev.time || ev.timestamp || lastSeen,
                         imageUrl: ev.imageUrl || ev.image,
@@ -218,13 +291,13 @@ export default function CameraPage() {
         />
         <CameraMiniStatCard
           label="Số ảnh đã chụp"
-          value={stats.totalCapturedImages || (photoRecords.length > 0 ? photoRecords.length : 46)}
+          value={stats.totalCapturedImages}
           icon={CameraIcon}
           accent="sky"
         />
         <CameraMiniStatCard
           label="Ảnh đã phân tích"
-          value={stats.analyzedImages || 47}
+          value={stats.analyzedImages}
           icon={ShieldCheck}
           accent="emerald"
         />
@@ -261,8 +334,36 @@ export default function CameraPage() {
         />
       )}
 
+      {/* 3. Lịch sử ảnh chụp từ App & Web */}
+      {!loading && photoRecords.length > 0 && (
+        <AppPhotoGalleryTable 
+          photos={photoRecords}
+          onDeletePhoto={handleDeletePhoto}
+        />
+      )}
+
       {/* 4. Lịch sử phân tích của AI */}
-      {!loading && aiRecords.length > 0 && <AIAnalysisTable records={aiRecords} />}
+      {!loading && aiRecords.length > 0 && (
+        <AIAnalysisTable 
+          records={aiRecords}
+          onDeleteRecord={(deletedId) => {
+            const record = aiRecords.find(r => r.id === deletedId);
+            if (record) {
+              handleDeletePhoto({
+                id: record.id,
+                deviceId: record.deviceId,
+                title: record.resultTitle,
+                time: record.capturedAt,
+                imageUrl: record.imageUrl || "",
+                type: "ai",
+                deviceName: record.deviceName,
+              });
+            } else {
+              setAiRecords(prev => prev.filter(r => r.id !== deletedId));
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

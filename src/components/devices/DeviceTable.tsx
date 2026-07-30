@@ -212,13 +212,15 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {paginatedDevices.map((device, index) => (
-              <tr
-                key={device.id}
-                className={`group transition-colors duration-150 ${
-                  index % 2 === 0 ? "bg-white" : "bg-[#F5F7FA]"
-                } hover:bg-sky-50/30`}
-              >
+            {paginatedDevices.map((device, index) => {
+              const isBottomRow = index >= paginatedDevices.length - 3;
+              return (
+                <tr
+                  key={device.id}
+                  className={`group transition-colors duration-150 ${
+                    index % 2 === 0 ? "bg-white" : "bg-[#F5F7FA]"
+                  } hover:bg-sky-50/30`}
+                >
                 {/* Device ID */}
                 <td className="px-6 py-4 font-mono text-xs font-bold text-slate-700">
                   {device.id}
@@ -303,7 +305,9 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
                     {activeDropdownId === device.id && (
                       <div 
                         ref={dropdownRef}
-                        className="absolute right-0 top-full z-[100] mt-1 w-44 rounded-2xl border border-sky-100 bg-white p-1.5 shadow-xl animate-in fade-in duration-100 text-left"
+                        className={`absolute right-0 ${
+                          isBottomRow ? "bottom-full mb-1" : "top-full mt-1"
+                        } z-[100] w-44 rounded-2xl border border-sky-100 bg-white p-1.5 shadow-2xl animate-in fade-in duration-100 text-left`}
                       >
                         <Link
                           href={`/settings?id=${device.id}`}
@@ -344,8 +348,9 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
                   </div>
                 </td>
               </tr>
-            ))}
-          </tbody>
+            );
+          })}
+        </tbody>
         </table>
       </div>
 

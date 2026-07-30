@@ -42,6 +42,7 @@ export interface AiRecord {
   deviceName: string;
   capturedAt: string;
   imageUrl: string | null;
+  originalImageUrl?: string | null;
   resultStatus: AiResultStatus;
   resultTitle: string;
   resultSummary: string;
@@ -52,6 +53,7 @@ export interface AiRecord {
 
 export interface PhotoRecord {
   id: string;
+  deviceId?: string;
   title: string;
   time: string;
   imageUrl: string;

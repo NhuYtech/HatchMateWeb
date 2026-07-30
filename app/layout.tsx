@@ -6,10 +6,10 @@ import { AuthProvider } from "@/src/components/AuthProvider";
 
 export const metadata: Metadata = {
   title: {
-    default: "HatchMate",
-    template: "%s | HatchMate",
+    default: "Trang chủ",
+    template: "%s",
   },
-  description: "Hệ thống giám sát và quản lý máy ấp trứng HatchMate",
+  description: "Hệ thống giám sát và quản lý máy ấp trứng",
   icons: {
     icon: "/logov2.png",
   },

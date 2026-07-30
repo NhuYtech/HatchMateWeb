@@ -48,8 +48,8 @@ export async function POST(request: Request) {
 
     const timestamp = Date.now();
     const appBaseUrl = process.env.APP_URL || "";
-    let rawImageUrl = appBaseUrl ? `${appBaseUrl}/fallback_raw.jpg` : "/fallback_raw.jpg";
-    let aiImageUrl = appBaseUrl ? `${appBaseUrl}/fallback_ai.jpg` : "/fallback_ai.jpg";
+    let rawImageUrl = appBaseUrl ? `${appBaseUrl}/incubator_eggs.png` : "/incubator_eggs.png";
+    let aiImageUrl = appBaseUrl ? `${appBaseUrl}/incubator_eggs.png` : "/incubator_eggs.png";
     const aiSuccess = Boolean(
       aiResult.success &&
       aiResult.processedImageBase64 &&

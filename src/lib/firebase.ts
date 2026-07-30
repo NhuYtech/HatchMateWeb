@@ -1,7 +1,10 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, setLogLevel } from "firebase/firestore";
 import { getDatabase } from "firebase/database";
+
+// Suppress internal Firebase WebChannel transport stream retry logs in development console
+setLogLevel("error");
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCmPM_aGO80FW3mtVhL5Bj0LQmtXWnLDWM",
@@ -21,7 +24,12 @@ const isFirebaseConfigured =
 // Initialize Firebase (checking if already initialized for SSR safety)
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+
+// Use initializeFirestore with experimentalAutoDetectLongPolling to fix WebChannel RPC transport stream error
+const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
+
 const rtdb = getDatabase(app);
 const googleProvider = new GoogleAuthProvider();
 

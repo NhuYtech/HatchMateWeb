@@ -8,6 +8,7 @@ import DataTablePagination from "@/src/components/common/DataTablePagination";
 
 interface AppPhotoGalleryTableProps {
   photos: PhotoRecord[];
+  onDeletePhoto?: (photo: PhotoRecord) => void;
 }
 
 function formatReadableDateTime(timeStr: string): string {
@@ -29,7 +30,7 @@ function formatReadableDateTime(timeStr: string): string {
   return timeStr;
 }
 
-export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTableProps) {
+export default function AppPhotoGalleryTable({ photos, onDeletePhoto }: AppPhotoGalleryTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [previewPhoto, setPreviewPhoto] = useState<PhotoRecord | null>(null);
@@ -137,13 +138,24 @@ export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTablePro
 
                 {/* Action Plain Text Link */}
                 <td className="px-5 py-3 text-center">
-                  <button
-                    type="button"
-                    onClick={() => setPreviewPhoto(photo)}
-                    className="font-bold text-sky-600 hover:text-sky-800 text-xs cursor-pointer hover:underline"
-                  >
-                    Xem phóng to
-                  </button>
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewPhoto(photo)}
+                      className="font-bold text-sky-600 hover:text-sky-800 text-xs cursor-pointer hover:underline"
+                    >
+                      Xem phóng to
+                    </button>
+                    {onDeletePhoto && (
+                      <button
+                        type="button"
+                        onClick={() => onDeletePhoto(photo)}
+                        className="font-bold text-rose-600 hover:text-rose-800 text-xs cursor-pointer hover:underline"
+                      >
+                        Xóa ảnh
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -172,12 +184,26 @@ export default function AppPhotoGalleryTable({ photos }: AppPhotoGalleryTablePro
               <p className="text-xs text-slate-500 font-semibold mt-1">
                 Thiết bị: {previewPhoto.deviceName} · Thời gian: {formatReadableDateTime(previewPhoto.time)}
               </p>
-              <button
-                onClick={() => setPreviewPhoto(null)}
-                className="absolute right-0 top-0 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="absolute right-0 top-0 flex items-center gap-2">
+                {onDeletePhoto && (
+                  <button
+                    onClick={() => {
+                      const photoToDelete = previewPhoto;
+                      setPreviewPhoto(null);
+                      onDeletePhoto(photoToDelete);
+                    }}
+                    className="flex h-8 px-3 items-center justify-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-bold transition cursor-pointer"
+                  >
+                    Xóa ảnh
+                  </button>
+                )}
+                <button
+                  onClick={() => setPreviewPhoto(null)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 shadow-sm flex items-center justify-center">

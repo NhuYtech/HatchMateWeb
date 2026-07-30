@@ -259,16 +259,39 @@ export default function CameraDetailModal({
           )}
         </div>
 
-        {/* NÚT AI NHẬN DIỆN TRỨNG (Giống hệt Mobile App) */}
-        <button
-          type="button"
-          onClick={handleRunAiDetection}
-          disabled={isAnalyzing}
-          className="w-full h-12 rounded-[22px] bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 active:scale-[0.98] transition duration-150 cursor-pointer border border-amber-400/40 disabled:opacity-75 disabled:cursor-not-allowed"
-        >
-          <Sparkles className={`h-4.5 w-4.5 text-amber-100 ${isAnalyzing ? "animate-spin" : ""}`} />
-          <span>{isAnalyzing ? "ĐANG PHÂN TÍCH AI..." : "✨ AI NHẬN DIỆN TRỨNG"}</span>
-        </button>
+        {/* NÚT AI NHẬN DIỆN TRỨNG - CHỈ CHO PHÉP NHẤN 1 LẦN */}
+        {(() => {
+          const isAlreadyAnalyzed = Boolean(
+            camera.lastAiConfidence !== undefined && camera.lastAiConfidence !== null && camera.lastAiConfidence > 0
+          );
+
+          return (
+            <button
+              type="button"
+              onClick={handleRunAiDetection}
+              disabled={isAnalyzing || isAlreadyAnalyzed}
+              className={`w-full h-12 rounded-[22px] font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition duration-150 border ${
+                isAlreadyAnalyzed
+                  ? "bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed shadow-none opacity-90"
+                  : "bg-[#E5A00D] hover:bg-[#D99308] text-white shadow-amber-500/25 active:scale-[0.98] cursor-pointer border-amber-400/40 disabled:opacity-75 disabled:cursor-not-allowed"
+              }`}
+            >
+              {isAlreadyAnalyzed ? (
+                <span>✓ ĐÃ HOÀN THÀNH PHÂN TÍCH AI ({camera.eggCount} QUẢ TRỨNG)</span>
+              ) : isAnalyzing ? (
+                <>
+                  <Sparkles className="h-4.5 w-4.5 text-orange-100 animate-spin" />
+                  <span>ĐANG PHÂN TÍCH AI...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4.5 w-4.5 text-orange-100" />
+                  <span>AI NHẬN DIỆN TRỨNG</span>
+                </>
+              )}
+            </button>
+          );
+        })()}
 
         {/* 2. AI Details Panel */}
         <div className="bg-white border border-[#FBEBE3] rounded-[28px] p-5 shadow-sm flex flex-col gap-3.5">
