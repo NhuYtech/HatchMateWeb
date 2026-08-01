@@ -277,7 +277,7 @@ export default function CameraDetailModal({
               }`}
             >
               {isAlreadyAnalyzed ? (
-                <span>✓ ĐÃ HOÀN THÀNH PHÂN TÍCH AI ({camera.eggCount} QUẢ TRỨNG)</span>
+                <span>✓ ĐÃ HOÀN THÀNH PHÂN TÍCH AI</span>
               ) : isAnalyzing ? (
                 <>
                   <Sparkles className="h-4.5 w-4.5 text-orange-100 animate-spin" />
@@ -324,26 +324,31 @@ export default function CameraDetailModal({
             {/* Stats progress bar & description */}
             <div className="flex-1 space-y-2">
               <div>
-                <p className="text-xs font-black text-sky-950">{camera.lastAiSummary}</p>
+                <p className="text-xs font-black text-sky-950">{camera.lastAiSummary || "AI nhận diện thành công"}</p>
                 <p className="text-[10px] font-semibold text-slate-400 mt-0.5">Mô hình AI: YOLOv8l (Chạy tại local)</p>
               </div>
               
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[10px] font-bold">
-                  <span className="text-slate-400">ĐỘ TIN CẬY (CONFIDENCE):</span>
-                  <span className="text-sky-950 font-mono">
-                    {camera.lastAiConfidence && camera.lastAiConfidence > 0 ? `${camera.lastAiConfidence}%` : "Không có"}
-                  </span>
-                </div>
-                {camera.lastAiConfidence && camera.lastAiConfidence > 0 ? (
-                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-500 ${camera.aiStatus === "alert" ? "bg-rose-500" : "bg-sky-600"}`} 
-                      style={{ width: `${camera.lastAiConfidence}%` }}
-                    />
+              {(() => {
+                const hasConf = Boolean(camera.lastAiConfidence && camera.lastAiConfidence > 0);
+                return (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] font-bold">
+                      <span className="text-slate-400">ĐỘ TIN CẬY (CONFIDENCE):</span>
+                      <span className="text-sky-950 font-mono">
+                        {hasConf ? `${camera.lastAiConfidence}%` : "-"}
+                      </span>
+                    </div>
+                    {hasConf && (
+                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${camera.aiStatus === "alert" ? "bg-rose-500" : "bg-sky-600"}`} 
+                          style={{ width: `${camera.lastAiConfidence}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
-                ) : null}
-              </div>
+                );
+              })()}
             </div>
           </div>
         </div>

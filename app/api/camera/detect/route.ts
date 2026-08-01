@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { admin, adminDb, adminRtdb, adminStorage, adminMessaging, isFirebaseAdminConfigured } from "@/src/lib/firebaseAdmin";
 import { FieldValue } from "firebase-admin/firestore";
+import crypto from "crypto";
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const deviceId = formData.get("deviceId") as string || "default_device";
+    const deviceId = (formData.get("deviceId") as string) || "default_device";
 
     if (!file) {
       return NextResponse.json({ error: "No image file provided" }, { status: 400 });
@@ -50,6 +51,8 @@ export async function POST(request: Request) {
     const appBaseUrl = process.env.APP_URL || "";
     let rawImageUrl = appBaseUrl ? `${appBaseUrl}/incubator_eggs.png` : "/incubator_eggs.png";
     let aiImageUrl = appBaseUrl ? `${appBaseUrl}/incubator_eggs.png` : "/incubator_eggs.png";
+    let storageUploadStatus: "success" | "bypassed_missing_credentials" | "failed" = "bypassed_missing_credentials";
+
     const aiSuccess = Boolean(
       aiResult.success &&
       aiResult.processedImageBase64 &&
@@ -58,33 +61,44 @@ export async function POST(request: Request) {
     );
 
     if (isFirebaseAdminConfigured) {
+      const bucket = adminStorage.bucket();
+
+      // Helper to upload buffer and return Firebase Storage media download URL with token
+      const uploadToStorage = async (filePath: string, buffer: Buffer): Promise<string> => {
+        const fileRef = bucket.file(filePath);
+        const downloadToken = crypto.randomUUID();
+        await fileRef.save(buffer, {
+          metadata: {
+            contentType: "image/jpeg",
+            metadata: {
+              firebaseStorageDownloadTokens: downloadToken
+            }
+          }
+        });
+        return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${downloadToken}`;
+      };
+
       // 3. Upload Raw Image to Firebase Storage
       try {
-        const bucket = adminStorage.bucket();
         const rawFileName = `incubators/${deviceId}/camera_frames/raw_${timestamp}.jpg`;
-        const rawFile = bucket.file(rawFileName);
-        await rawFile.save(imageBuffer, {
-          metadata: { contentType: "image/jpeg" }
-        });
-        rawImageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(rawFileName)}?alt=media`;
+        rawImageUrl = await uploadToStorage(rawFileName, imageBuffer);
+        storageUploadStatus = "success";
+        console.log(`Raw image uploaded successfully to Firebase Storage: ${rawFileName}`);
       } catch (storageErr: any) {
-        console.warn("Firebase Storage raw image upload failed:", storageErr.message || storageErr);
+        storageUploadStatus = "failed";
+        console.error("Firebase Storage raw image upload failed:", storageErr.message || storageErr);
       }
 
       // 4. Upload Processed AI Image to Firebase Storage
       aiImageUrl = rawImageUrl; // Fallback to raw image if AI failed or upload fails
       if (aiResult.processedImageBase64) {
         try {
-          const bucket = adminStorage.bucket();
           const aiImageBuffer = Buffer.from(aiResult.processedImageBase64, "base64");
           const aiFileName = `incubators/${deviceId}/camera_frames/ai_${timestamp}.jpg`;
-          const aiFile = bucket.file(aiFileName);
-          await aiFile.save(aiImageBuffer, {
-            metadata: { contentType: "image/jpeg" }
-          });
-          aiImageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(aiFileName)}?alt=media`;
+          aiImageUrl = await uploadToStorage(aiFileName, aiImageBuffer);
+          console.log(`AI image uploaded successfully to Firebase Storage: ${aiFileName}`);
         } catch (storageErr: any) {
-          console.warn("Firebase Storage AI image upload failed:", storageErr.message || storageErr);
+          console.error("Firebase Storage AI image upload failed:", storageErr.message || storageErr);
         }
       }
 
@@ -115,7 +129,7 @@ export async function POST(request: Request) {
       const isEggLost = aiSuccess && (currentEggCount < initialEggCount);
       const labelText = aiSuccess ? `${currentEggCount}` : "Chờ AI phân tích";
 
-      // 6. Update Firestore camera collection (matching current Flutter App structure)
+      // 6. Update Firestore camera collection & device specific frames
       try {
         await adminDb.collection("camera").doc("current").set({
           latestImageUrl: rawImageUrl,
@@ -125,7 +139,6 @@ export async function POST(request: Request) {
           updatedAt: FieldValue.serverTimestamp()
         }, { merge: true });
 
-        // Also update device specific record in Firestore
         await adminDb.collection("incubators").doc(deviceId).collection("camera_frames").add({
           latestImageUrl: rawImageUrl,
           aiImageUrl: aiImageUrl,
@@ -133,13 +146,25 @@ export async function POST(request: Request) {
           confidence: aiSuccess ? aiResult.confidence : 0,
           updatedAt: FieldValue.serverTimestamp()
         });
+
+        // Retention Cleanup for Firestore: keep last 50 frames (trigger cleanup if > 55)
+        const framesSnap = await adminDb.collection("incubators").doc(deviceId).collection("camera_frames")
+          .orderBy("updatedAt", "asc")
+          .get();
+
+        if (framesSnap.size > 55) {
+          const docsToDelete = framesSnap.docs.slice(0, framesSnap.size - 50);
+          for (const doc of docsToDelete) {
+            await doc.ref.delete();
+          }
+          console.log(`Cleaned up ${docsToDelete.length} oldest Firestore camera frame records for ${deviceId}`);
+        }
       } catch (firestoreErr: any) {
-        console.warn("Firestore update failed:", firestoreErr.message || firestoreErr);
+        console.warn("Firestore update/cleanup failed:", firestoreErr.message || firestoreErr);
       }
 
-      // 7. Update Realtime Database incubator telemetry & status
+      // 7. Update Realtime Database incubator telemetry, status, and ai_events history
       try {
-        // Only update eggCount in telemetry if AI detection succeeded
         const telemetryUpdate: Record<string, any> = {
           lastSeen: new Date().toLocaleTimeString("vi-VN"),
           isEggLost: isEggLost,
@@ -151,15 +176,68 @@ export async function POST(request: Request) {
 
         await adminRtdb.ref(`incubators/${deviceId}/telemetry`).update(telemetryUpdate);
 
-        // Mark camera as online and save previewImage + confidence
         await adminRtdb.ref(`incubators/${deviceId}/camera`).update({
           status: "online",
           lastCaptureAt: new Date().toLocaleTimeString("vi-VN"),
           previewImage: aiImageUrl,
           confidence: aiSuccess ? aiResult.confidence : 0
         });
+
+        // Save AI event into RTDB ai_events
+        const nowIso = new Date().toISOString();
+        await adminRtdb.ref(`incubators/${deviceId}/ai_events`).push({
+          title: aiSuccess ? `Ảnh AI phát hiện ${aiResult.detectedCount} quả` : "Ảnh tự động (Định kỳ)",
+          imageUrl: aiImageUrl,
+          eggCount: currentEggCount,
+          confidence: aiSuccess ? aiResult.confidence : 0,
+          type: "auto",
+          time: nowIso,
+          timestamp: nowIso
+        });
+
+        // Retention Cleanup for RTDB ai_events: keep last 50 items (trigger cleanup if > 55 buffer)
+        const eventsSnap = await adminRtdb.ref(`incubators/${deviceId}/ai_events`).once("value");
+        if (eventsSnap.exists()) {
+          const eventsObj = eventsSnap.val();
+          const keys = Object.keys(eventsObj);
+
+          if (keys.length > 55) {
+            // Sort keys by time ascending
+            keys.sort((a, b) => {
+              const tA = eventsObj[a].time || eventsObj[a].timestamp || "";
+              const tB = eventsObj[b].time || eventsObj[b].timestamp || "";
+              return tA.localeCompare(tB);
+            });
+
+            const keysToRemove = keys.slice(0, keys.length - 50);
+            for (const key of keysToRemove) {
+              const item = eventsObj[key];
+              const itemImageUrl = item?.imageUrl || item?.image || "";
+
+              // Atomic Step 1: Delete RTDB record first
+              await adminRtdb.ref(`incubators/${deviceId}/ai_events/${key}`).remove();
+
+              // Atomic Step 2: Delete associated Storage blob if it is a Firebase Storage URL
+              if (itemImageUrl.includes("firebasestorage.googleapis.com")) {
+                try {
+                  const urlObj = new URL(itemImageUrl);
+                  const pathParts = urlObj.pathname.split("/o/");
+                  if (pathParts.length > 1) {
+                    const encodedPath = pathParts[1];
+                    const decodedPath = decodeURIComponent(encodedPath);
+                    await bucket.file(decodedPath).delete();
+                    console.log(`Cleaned up Firebase Storage blob: ${decodedPath}`);
+                  }
+                } catch (blobErr: any) {
+                  console.warn("Storage blob cleanup warning:", blobErr.message || blobErr);
+                }
+              }
+            }
+            console.log(`Cleaned up ${keysToRemove.length} oldest RTDB ai_events for ${deviceId}`);
+          }
+        }
       } catch (rtdbErr: any) {
-        console.warn("Firebase RTDB update failed:", rtdbErr.message || rtdbErr);
+        console.warn("Firebase RTDB update/cleanup failed:", rtdbErr.message || rtdbErr);
       }
 
       // 8. Send Push Notification FCM if egg count changed or egg is lost
@@ -217,7 +295,8 @@ export async function POST(request: Request) {
       confidence: aiResult.confidence,
       rawImageUrl,
       aiImageUrl: aiImageUrl || rawImageUrl,
-      aiAnalysisFailed: !aiSuccess
+      aiAnalysisFailed: !aiSuccess,
+      storageUploadStatus
     });
 
   } catch (error) {
@@ -225,3 +304,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+

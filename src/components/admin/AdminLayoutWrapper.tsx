@@ -38,7 +38,7 @@ export default function AdminLayoutWrapper({
 
     const isLoginPath = pathname === "/" || pathname === "/login";
 
-    if (false) {
+    if (!currentUser && !isLoginPath) {
       setAuthorized(false);
       router.replace("/");
     } else if (currentUser && isLoginPath) {

@@ -37,17 +37,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (user) {
           const userEmail = user.email?.toLowerCase().trim();
-
-          // Enforce: ONLY hnyhttt2211015@student.ctuet.edu.vn can log into HatchMateWeb
-          if (userEmail !== ADMIN_EMAIL.toLowerCase()) {
-            console.warn(`[Auth] Access denied for ${userEmail}. Only ${ADMIN_EMAIL} is permitted on Web.`);
+          const allowedAdminEmails = [ADMIN_EMAIL.toLowerCase(), OWNER_EMAIL.toLowerCase()];
+          if (!userEmail || !allowedAdminEmails.includes(userEmail)) {
+            console.warn(`[Auth] Access denied for ${userEmail}. Only Admin accounts are permitted on Web.`);
             try {
               await firebaseLogout();
             } catch (e) {
               console.error("Firebase logout error:", e);
             }
             setCurrentUser(null);
-            setAuthError("Rất tiếc, chỉ tài khoản Quản trị viên (hnyhttt2211015@student.ctuet.edu.vn) mới có quyền đăng nhập vào hệ thống Web!");
+            setAuthError("Rất tiếc, chỉ tài khoản Quản trị viên mới có quyền đăng nhập vào hệ thống Web!");
             setLoading(false);
             return;
           }

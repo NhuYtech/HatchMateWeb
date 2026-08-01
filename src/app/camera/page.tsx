@@ -206,7 +206,7 @@ export default function CameraPage() {
                     } else if (evIsLost) {
                       summaryText = `Phát hiện sụt giảm trứng: Ban đầu ${initialEggCount} quả, hiện còn ${evEggCount} quả (Mất ${initialEggCount - evEggCount} quả)`;
                     } else {
-                      summaryText = `AI nhận diện thành công: ${evEggCount} quả trứng`;
+                      summaryText = "AI nhận diện thành công";
                     }
 
                     activeAiRecords.unshift({

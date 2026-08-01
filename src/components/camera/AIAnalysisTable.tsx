@@ -324,15 +324,17 @@ export default function AIAnalysisTable({ records, onRefresh, onDeleteRecord }: 
                                (record.resultTitle && (record.resultTitle.includes("THỦ CÔNG") || record.resultTitle.includes("NGƯỜI DÙNG")));
               const isNoEgg = Boolean(record.imageUrl?.includes("no_egg") || (record.resultTitle && record.resultTitle.includes("KHÔNG TÌM THẤY TRỨNG")));
 
-              let displaySummary = record.resultSummary;
+              let displaySummary = record.resultSummary || "";
               if (isManual) {
                 displaySummary = "Ảnh chụp từ ứng dụng/Web, chưa qua phân tích AI";
               } else if (isNoEgg) {
-                displaySummary = "AI nhận diện: 0 quả trứng (Không tìm thấy trứng trong buồng ấp)";
+                displaySummary = "AI nhận diện: Không tìm thấy trứng trong buồng ấp";
               } else {
-                const titleMatch = record.resultTitle?.match(/(\d+)\s*quả/i);
-                if (titleMatch && displaySummary && displaySummary.includes("24 quả") && titleMatch[1] !== "24") {
-                  displaySummary = displaySummary.replace(/24\s*quả/g, `${titleMatch[1]} quả`);
+                if (displaySummary) {
+                  displaySummary = displaySummary.replace(/:\s*\d+\s*quả\s*trứng/g, "").replace(/:\s*\d+\s*quả/g, "");
+                }
+                if (!displaySummary || displaySummary.includes("AI nhận diện thành công")) {
+                  displaySummary = "AI nhận diện thành công";
                 }
               }
 
@@ -392,13 +394,13 @@ export default function AIAnalysisTable({ records, onRefresh, onDeleteRecord }: 
 
                   {/* Độ tin cậy */}
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {!isManual && !isNoEgg && record.confidence !== undefined && record.confidence !== null && record.confidence > 0 ? (
+                    {!isManual && !isNoEgg ? (
                       <span className="font-semibold text-slate-800 text-xs">
-                        {record.confidence}%
+                        {record.confidence && record.confidence > 0 ? `${record.confidence}%` : "-"}
                       </span>
                     ) : (
                       <span className="font-medium text-slate-400 text-xs italic">
-                        Không có
+                        Chưa quét
                       </span>
                     )}
                   </td>
@@ -533,18 +535,16 @@ export default function AIAnalysisTable({ records, onRefresh, onDeleteRecord }: 
                 {getStatusText(previewRecord.resultStatus, previewRecord.resultTitle)}
               </div>
               <p className="text-sm font-bold text-sky-950 uppercase tracking-wide">{previewRecord.resultTitle}</p>
-              <p className="text-xs font-semibold text-slate-600 leading-relaxed">{previewRecord.resultSummary}</p>
+              <p className="text-xs font-semibold text-slate-600 leading-relaxed">
+                {(previewRecord.resultSummary || "AI nhận diện thành công").replace(/:\s*\d+\s*quả\s*trứng/g, "").replace(/:\s*\d+\s*quả/g, "")}
+              </p>
               <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-slate-500">
                 <span>
                   Độ tin cậy:{" "}
                   <strong className="text-sky-700">
-                    {previewRecord.resultStatus !== "manual" &&
-                    !(previewRecord.resultTitle && (previewRecord.resultTitle.includes("THỦ CÔNG") || previewRecord.resultTitle.includes("NGƯỜI DÙNG"))) &&
-                    previewRecord.confidence !== undefined &&
-                    previewRecord.confidence !== null &&
-                    previewRecord.confidence > 0
+                    {previewRecord.confidence && previewRecord.confidence > 0
                       ? `${previewRecord.confidence}%`
-                      : "Không có"}
+                      : "-"}
                   </strong>
                 </span>
                 <span>Mô hình: <strong>{previewRecord.processedBy}</strong></span>
@@ -575,7 +575,7 @@ export default function AIAnalysisTable({ records, onRefresh, onDeleteRecord }: 
                             ...previewRecord,
                             resultStatus: "warning",
                             resultTitle: "KHÔNG TÌM THẤY TRỨNG",
-                            resultSummary: "AI nhận diện: 0 quả trứng (Không tìm thấy trứng trong buồng ấp)",
+                            resultSummary: "AI nhận diện: Không tìm thấy trứng trong buồng ấp",
                             confidence: null,
                             imageUrl: result.processedImageUrl || previewRecord.imageUrl,
                             processedBy: "HatchMate YOLOv8 AI",
@@ -584,9 +584,9 @@ export default function AIAnalysisTable({ records, onRefresh, onDeleteRecord }: 
                           setPreviewRecord({
                             ...previewRecord,
                             resultStatus: "normal",
-                            resultTitle: `${result.detectedCount} quả trứng`,
-                            resultSummary: `AI nhận diện thành công: ${result.detectedCount} quả trứng`,
-                            confidence: result.confidence,
+                            resultTitle: "AI nhận diện thành công",
+                            resultSummary: "AI nhận diện thành công",
+                            confidence: result.confidence || null,
                             imageUrl: result.processedImageUrl || previewRecord.imageUrl,
                             processedBy: "HatchMate YOLOv8 AI",
                           });
