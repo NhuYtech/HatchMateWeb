@@ -59,6 +59,7 @@ export async function analyzeImageWithAi(
 
     // Endpoints array matching Flutter App priority
     const endpoints = [
+      "http://172.16.5.244:8000/predict",
       "http://127.0.0.1:8000/predict",
       "http://localhost:8000/predict",
       "/api/camera/detect",
@@ -70,10 +71,15 @@ export async function analyzeImageWithAi(
         formData.append("file", blob, "captured_egg.jpg");
         formData.append("deviceId", deviceId);
 
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 12000);
+
         const res = await fetch(url, {
           method: "POST",
           body: formData,
+          signal: controller.signal,
         });
+        clearTimeout(timer);
 
         if (res.ok) {
           const data = await res.json();

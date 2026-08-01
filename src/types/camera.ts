@@ -47,6 +47,7 @@ export interface AiRecord {
   resultTitle: string;
   resultSummary: string;
   confidence?: number | null;
+  detectedCount?: number | null;
   processedBy: string;
   notes?: string | null;
 }

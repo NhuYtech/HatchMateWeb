@@ -529,14 +529,28 @@ export default function AIAnalysisTable({ records, onRefresh, onDeleteRecord }: 
               )}
             </div>
 
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2">
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500">KẾT QUẢ CHẨN ĐOÁN:</span>
                 {getStatusText(previewRecord.resultStatus, previewRecord.resultTitle)}
               </div>
-              <p className="text-sm font-bold text-sky-950 uppercase tracking-wide">{previewRecord.resultTitle}</p>
+              <p className="text-sm font-black text-sky-950 uppercase tracking-wide">{previewRecord.resultTitle}</p>
+              
+              <div className="flex items-center justify-between bg-sky-50/80 border border-sky-100 rounded-xl px-3.5 py-2">
+                <span className="text-xs font-bold text-sky-800">SỐ TRỨNG NHẬN DIỆN:</span>
+                <span className="text-sm font-black text-sky-950 font-mono">
+                  {previewRecord.detectedCount !== undefined && previewRecord.detectedCount !== null
+                    ? `${previewRecord.detectedCount} quả`
+                    : (previewRecord.resultTitle?.match(/(\d+)\s*quả/)?.[1] 
+                        ? `${previewRecord.resultTitle.match(/(\d+)\s*quả/)?.[1]} quả` 
+                        : (previewRecord.resultSummary?.match(/(\d+)\s*quả/)?.[1]
+                            ? `${previewRecord.resultSummary.match(/(\d+)\s*quả/)?.[1]} quả`
+                            : "Đã xác nhận"))}
+                </span>
+              </div>
+
               <p className="text-xs font-semibold text-slate-600 leading-relaxed">
-                {(previewRecord.resultSummary || "AI nhận diện thành công").replace(/:\s*\d+\s*quả\s*trứng/g, "").replace(/:\s*\d+\s*quả/g, "")}
+                {previewRecord.resultSummary || "AI nhận diện thành công"}
               </p>
               <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-slate-500">
                 <span>
@@ -573,6 +587,7 @@ export default function AIAnalysisTable({ records, onRefresh, onDeleteRecord }: 
                         if (result.detectedCount === 0) {
                           setPreviewRecord({
                             ...previewRecord,
+                            detectedCount: 0,
                             resultStatus: "warning",
                             resultTitle: "KHÔNG TÌM THẤY TRỨNG",
                             resultSummary: "AI nhận diện: Không tìm thấy trứng trong buồng ấp",
@@ -583,9 +598,10 @@ export default function AIAnalysisTable({ records, onRefresh, onDeleteRecord }: 
                         } else {
                           setPreviewRecord({
                             ...previewRecord,
+                            detectedCount: result.detectedCount,
                             resultStatus: "normal",
-                            resultTitle: "AI nhận diện thành công",
-                            resultSummary: "AI nhận diện thành công",
+                            resultTitle: `Phát hiện ${result.detectedCount} quả trứng`,
+                            resultSummary: `AI nhận diện thành công: Tìm thấy ${result.detectedCount} quả trứng`,
                             confidence: result.confidence || null,
                             imageUrl: result.processedImageUrl || previewRecord.imageUrl,
                             processedBy: "HatchMate YOLOv8 AI",

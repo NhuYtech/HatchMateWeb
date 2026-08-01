@@ -130,8 +130,27 @@ export default function CameraPage() {
               const isEggLost = item.telemetry?.isEggLost === true || (eggCount < initialEggCount && initialEggCount > 0);
               const lostEggCount = isEggLost ? (initialEggCount - eggCount) : 0;
 
-              const cameraUrl = item.camera?.url || item.camera?.streamUrl || item.camera?.stream_url || item.camera_url || item.streamUrl || "http://192.168.88.220:81/stream";
-              const cameraIp = item.camera?.ipAddress || item.camera?.ip || item.ipAddress || "192.168.88.220:81";
+              const rawCamUrl = item.telemetry?.ip || item.telemetry?.camera_ip || item.camera?.ip || item.ip || item.camera_ip || item.camera?.url || item.camera?.streamUrl || item.camera?.stream_url || item.device_info?.ip || item.status?.ip || item.camera_url || item.streamUrl || "";
+              const formatCamUrl = (raw: string) => {
+                if (!raw || !raw.trim() || raw.includes("192.168.88.220")) return "http://172.16.6.48:81/stream";
+                let u = raw.trim();
+                if (!u.startsWith("http://") && !u.startsWith("https://")) {
+                  u = `http://${u}`;
+                }
+                try {
+                  const parsed = new URL(u);
+                  const host = parsed.hostname;
+                  const port = parsed.port || "81";
+                  let path = parsed.pathname;
+                  if (!path || path === "/") path = "/stream";
+                  return `http://${host}:${port}${path}`;
+                } catch (e) {
+                  return u;
+                }
+              };
+
+              const cameraUrl = formatCamUrl(rawCamUrl);
+              const cameraIp = item.camera?.ipAddress || item.camera?.ip || item.telemetry?.ip || item.ip || "192.168.88.220:81";
 
               activeCameras.push({
                 id: `cam-${key}`,
