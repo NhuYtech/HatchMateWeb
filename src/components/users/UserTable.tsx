@@ -406,7 +406,7 @@ export default function UserTable({ users, onAddUser, onRefresh }: UserTableProp
                   {/* Row Actions Dropdown */}
                   <td className="px-4 py-2.5 relative">
                     <div className="flex items-center justify-center gap-2">
-                      <div className="relative">
+                      <div className={`relative ${activeDropdownId === user.id ? "z-50" : ""}`}>
                         <button
                           type="button"
                           onClick={() => setActiveDropdownId(activeDropdownId === user.id ? null : user.id)}
@@ -419,7 +419,7 @@ export default function UserTable({ users, onAddUser, onRefresh }: UserTableProp
                           <div
                             ref={dropdownRef}
                             className={`absolute right-0 z-[100] w-48 rounded-xl border border-sky-100 bg-white p-1.5 shadow-2xl animate-in fade-in duration-100 ${
-                              index >= Math.max(0, paginatedUsers.length - 3)
+                              paginatedUsers.length > 3 && index >= paginatedUsers.length - 2
                                 ? "bottom-full mb-2 origin-bottom-right"
                                 : "top-full mt-1.5 origin-top-right"
                             }`}

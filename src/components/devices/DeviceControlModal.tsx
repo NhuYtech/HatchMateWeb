@@ -124,8 +124,7 @@ export default function DeviceControlModal({
         heater1: nextHeater1,
         heater2: nextHeater2,
         turner: turner, // Keep turner state
-        reset: false,
-        camera: false
+        reset: false
       }).catch(err => console.error("Lỗi cập nhật tự động:", err));
     }
   }, [opMode, temp, humi, settings, fan, heater1, heater2, turner, deviceId, loading]);

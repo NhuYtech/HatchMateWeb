@@ -13,7 +13,6 @@ import {
   Thermometer,
   Droplets,
   RotateCw,
-  Camera,
   Bell,
   Wrench,
   AlertTriangle,
@@ -30,7 +29,8 @@ import {
   Radio,
   FileCheck2,
   HardDriveDownload,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from "lucide-react";
 
 // Segmented Control Component
@@ -164,12 +164,6 @@ function DeviceConfigurationContent() {
   const [servoAngle, setServoAngle] = useState(45);
   const [turnDuration, setTurnDuration] = useState(60);
 
-  // 6. Camera state
-  const [enableAI, setEnableAI] = useState(true);
-  const [captureInterval, setCaptureInterval] = useState(3);
-  const [resolution, setResolution] = useState("1080p");
-  const [autoUpload, setAutoUpload] = useState(true);
-
   // 7. Notification toggles
   const [notifyTemp, setNotifyTemp] = useState(true);
   const [notifyHumi, setNotifyHumi] = useState(true);
@@ -288,6 +282,28 @@ function DeviceConfigurationContent() {
       setTurnDuration(tDuration);
     }
   }, [opMode, currentDay]);
+
+  // Helper to change day and auto-sync stage and start date
+  const handleDayChange = (newDay: number) => {
+    const clampedDay = Math.max(1, Math.min(21, newDay));
+    setCurrentDay(clampedDay);
+
+    let newPhase = "Giai đoạn 1";
+    if (clampedDay >= 8 && clampedDay <= 17) {
+      newPhase = "Giai đoạn 2";
+    } else if (clampedDay >= 18) {
+      newPhase = "Giai đoạn 3";
+    }
+    setCurrentPhase(newPhase);
+
+    // Sync start date
+    const today = new Date();
+    today.setDate(today.getDate() - (clampedDay - 1));
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    setStartDate(`${yyyy}-${mm}-${dd}`);
+  };
 
   const handleSave = async () => {
     setPopupAlert({
@@ -529,20 +545,18 @@ function DeviceConfigurationContent() {
               </div>
               <div>
                 <h2 className="text-lg font-extrabold text-slate-800">Chu kỳ ấp trứng</h2>
-
+                <p className="text-xs text-slate-400 font-medium">Điều chỉnh ngày ấp hiện tại hoặc giai đoạn để hệ thống tự động áp dụng các ngưỡng chuẩn sinh học.</p>
               </div>
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-slate-500 tracking-wider uppercase">Ngày bắt đầu</label>
+                <label className="text-xs font-semibold text-slate-500 tracking-wider uppercase">Ngày bắt đầu ấp</label>
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  disabled={opMode === "auto"}
-                  className={`h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 outline-none transition duration-200 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-50 ${opMode === "auto" ? "opacity-60 bg-slate-100 cursor-not-allowed" : ""
-                    }`}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 outline-none transition duration-200 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-50 cursor-pointer"
                 />
               </div>
 
@@ -552,7 +566,6 @@ function DeviceConfigurationContent() {
                 onChange={setTotalDays}
                 unit="ngày"
                 min={1}
-                disabled={opMode === "auto"}
               />
 
               <UnitInput
@@ -561,50 +574,156 @@ function DeviceConfigurationContent() {
                 onChange={setStopTurningDay}
                 unit="ngày"
                 min={1}
-                disabled={opMode === "auto"}
               />
 
+              {/* Editable Day Selector Dropdown */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-slate-500 tracking-wider uppercase">Ngày thứ hiện tại</label>
-                <div className="h-11 rounded-xl border border-slate-200 bg-slate-100 flex items-center px-4 text-sm font-semibold text-slate-500 select-none">
-                  Ngày {currentDay}
-                </div>
+                <label className="text-xs font-semibold text-slate-500 tracking-wider uppercase">Ngày ấp hiện tại</label>
+                <select
+                  value={currentDay}
+                  onChange={(e) => handleDayChange(Number(e.target.value))}
+                  className="h-11 rounded-xl border border-sky-300 bg-sky-50/50 px-4 text-sm font-bold text-sky-900 outline-none transition duration-200 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-100 cursor-pointer"
+                >
+                  {Array.from({ length: 21 }, (_, i) => i + 1).map((day) => (
+                    <option key={day} value={day}>
+                      Ngày {day} {day <= 7 ? "(Giai đoạn 1)" : day <= 17 ? "(Giai đoạn 2)" : "(Giai đoạn 3 - Nở)"}
+                    </option>
+                  ))}
+                </select>
               </div>
 
+              {/* Editable Stage Selector Dropdown */}
               <div className="flex flex-col gap-2 sm:col-span-2">
-                <label className="text-xs font-semibold text-slate-500 tracking-wider uppercase">Giai đoạn hiện tại</label>
-                <div className="relative">
-                  <select
-                    value={currentPhase}
-                    onChange={(e) => {
-                      const newPhase = e.target.value;
-                      setCurrentPhase(newPhase);
-                      let newDay = currentDay;
-                      if (newPhase === "Giai đoạn 1") {
-                        newDay = 1;
-                      } else if (newPhase === "Giai đoạn 2") {
-                        newDay = 8;
-                      } else if (newPhase === "Giai đoạn 3") {
-                        newDay = 18;
-                      }
-                      setCurrentDay(newDay);
+                <label className="text-xs font-semibold text-slate-500 tracking-wider uppercase">Giai đoạn ấp hiện tại</label>
+                <select
+                  value={currentPhase}
+                  onChange={(e) => {
+                    const newPhase = e.target.value;
+                    if (newPhase === "Giai đoạn 1") handleDayChange(1);
+                    else if (newPhase === "Giai đoạn 2") handleDayChange(8);
+                    else if (newPhase === "Giai đoạn 3") handleDayChange(18);
+                  }}
+                  className="h-11 w-full rounded-xl border border-sky-300 bg-sky-50/50 px-4 text-sm font-bold text-sky-900 outline-none transition duration-200 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-100 cursor-pointer"
+                >
+                  <option value="Giai đoạn 1">Giai đoạn 1: Ngày 1 – 7 (Ấp giai đoạn đầu)</option>
+                  <option value="Giai đoạn 2">Giai đoạn 2: Ngày 8 – 17 (Ấp giai đoạn giữa)</option>
+                  <option value="Giai đoạn 3">Giai đoạn 3: Ngày 18 – 21 (Giai đoạn mổ vỏ & nở)</option>
+                </select>
+              </div>
+            </div>
 
-                      // Automatically adjust startDate to align with the new day
-                      const today = new Date();
-                      today.setDate(today.getDate() - (newDay - 1));
-                      const yyyy = today.getFullYear();
-                      const mm = String(today.getMonth() + 1).padStart(2, '0');
-                      const dd = String(today.getDate()).padStart(2, '0');
-                      setStartDate(`${yyyy}-${mm}-${dd}`);
-                    }}
-                    disabled={opMode === "auto"}
-                    className={`h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition duration-200 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-50 ${opMode === "auto" ? "opacity-60 bg-slate-100 cursor-not-allowed" : ""
-                      }`}
-                  >
-                    <option value="Giai đoạn 1">Giai đoạn 1 (Ấp trứng giai đoạn đầu - Ngày 1–7)</option>
-                    <option value="Giai đoạn 2">Giai đoạn 2 (Ấp trứng giai đoạn giữa - Ngày 8–17)</option>
-                    <option value="Giai đoạn 3">Giai đoạn 3 (Ấp trứng giai đoạn cuối - Ngày 18–21)</option>
-                  </select>
+            {/* 3-Stage Information & Preset Cards (Matching App) */}
+            <div className="mt-2 rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50/40 via-white to-amber-50/30 p-4 shadow-sm">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-500" />
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                    THÔNG SỐ CHUẨN 3 GIAI ĐOẠN (ẤP TRỨNG GÀ)
+                  </h4>
+                </div>
+                <span className="text-[10px] font-extrabold text-sky-700 bg-sky-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  {opMode === "auto" ? "Chế độ Auto đang áp dụng" : "Chế độ Manual"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                {/* Stage 1 Card */}
+                <div
+                  onClick={() => handleDayChange(1)}
+                  className={`p-3.5 rounded-xl border transition-all duration-200 cursor-pointer ${
+                    currentDay >= 1 && currentDay <= 7
+                      ? "bg-sky-500 text-white border-sky-600 shadow-md shadow-sky-200 scale-[1.02]"
+                      : "bg-white border-slate-200/80 text-slate-700 hover:border-sky-300 hover:bg-sky-50/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-extrabold uppercase tracking-wider">Giai đoạn 1</span>
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                      currentDay >= 1 && currentDay <= 7 ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700"
+                    }`}>
+                      Ngày 1 - 7
+                    </span>
+                  </div>
+                  <div className="space-y-1 text-xs font-medium">
+                    <p className="flex items-center justify-between">
+                      <span className="opacity-80">Nhiệt độ:</span>
+                      <span className="font-bold">37.5°C – 38.1°C</span>
+                    </p>
+                    <p className="flex items-center justify-between">
+                      <span className="opacity-80">Độ ẩm:</span>
+                      <span className="font-bold">58% – 68%</span>
+                    </p>
+                    <p className="flex items-center justify-between">
+                      <span className="opacity-80">Đảo trứng:</span>
+                      <span className="font-bold">2h / lần (60s)</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Stage 2 Card */}
+                <div
+                  onClick={() => handleDayChange(8)}
+                  className={`p-3.5 rounded-xl border transition-all duration-200 cursor-pointer ${
+                    currentDay >= 8 && currentDay <= 17
+                      ? "bg-amber-500 text-white border-amber-600 shadow-md shadow-amber-200 scale-[1.02]"
+                      : "bg-white border-slate-200/80 text-slate-700 hover:border-amber-300 hover:bg-amber-50/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-extrabold uppercase tracking-wider">Giai đoạn 2</span>
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                      currentDay >= 8 && currentDay <= 17 ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"
+                    }`}>
+                      Ngày 8 - 17
+                    </span>
+                  </div>
+                  <div className="space-y-1 text-xs font-medium">
+                    <p className="flex items-center justify-between">
+                      <span className="opacity-80">Nhiệt độ:</span>
+                      <span className="font-bold">37.2°C – 37.8°C</span>
+                    </p>
+                    <p className="flex items-center justify-between">
+                      <span className="opacity-80">Độ ẩm:</span>
+                      <span className="font-bold">55% – 65%</span>
+                    </p>
+                    <p className="flex items-center justify-between">
+                      <span className="opacity-80">Đảo trứng:</span>
+                      <span className="font-bold">2h / lần (60s)</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Stage 3 Card */}
+                <div
+                  onClick={() => handleDayChange(18)}
+                  className={`p-3.5 rounded-xl border transition-all duration-200 cursor-pointer ${
+                    currentDay >= 18 && currentDay <= 21
+                      ? "bg-emerald-500 text-white border-emerald-600 shadow-md shadow-emerald-200 scale-[1.02]"
+                      : "bg-white border-slate-200/80 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-extrabold uppercase tracking-wider">Giai đoạn 3 (Nở)</span>
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                      currentDay >= 18 && currentDay <= 21 ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"
+                    }`}>
+                      Ngày 18 - 21
+                    </span>
+                  </div>
+                  <div className="space-y-1 text-xs font-medium">
+                    <p className="flex items-center justify-between">
+                      <span className="opacity-80">Nhiệt độ:</span>
+                      <span className="font-bold">36.9°C – 37.5°C</span>
+                    </p>
+                    <p className="flex items-center justify-between">
+                      <span className="opacity-80">Độ ẩm:</span>
+                      <span className="font-bold">72% – 82%</span>
+                    </p>
+                    <p className="flex items-center justify-between">
+                      <span className="opacity-80">Đảo trứng:</span>
+                      <span className="font-bold">TẮT (Dừng đảo)</span>
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -752,56 +871,6 @@ function DeviceConfigurationContent() {
                   unit="giây"
                   disabled={opMode === "auto"}
                 />
-              </div>
-            </div>
-          </section>
-
-          {/* Card 6 — Camera & AI */}
-          <section className="bg-white rounded-[24px] border border-slate-200/70 p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all duration-300 hover:shadow-[0_8px_35px_rgb(0,0,0,0.03)] flex flex-col gap-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-sky-50 text-sky-500">
-                  <Camera className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-extrabold text-slate-800">Camera</h2>
-
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
-              <UnitInput
-                label="Tần suất chụp"
-                value={captureInterval}
-                onChange={setCaptureInterval}
-                unit="giờ"
-                disabled={opMode === "auto"}
-              />
-
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-slate-500 tracking-wider uppercase">Độ phân giải</label>
-                <select
-                  value={resolution}
-                  onChange={(e) => setResolution(e.target.value)}
-                  className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition duration-200 focus:border-sky-400 focus:bg-white"
-                >
-                  <option value="720p">720p (HD)</option>
-                  <option value="1080p">1080p (Full HD)</option>
-                  <option value="4K">4K (Ultra HD)</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col justify-end">
-                <button
-                  type="button"
-                  onClick={() => triggerMaintenance("capture")}
-                  disabled={popupAlert?.type === "loading"}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100/80 px-5 text-sm font-bold shadow-sm transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer duration-150"
-                >
-                  <Camera className="h-4 w-4 text-sky-500" />
-                  Chụp 1 ảnh
-                </button>
               </div>
             </div>
           </section>

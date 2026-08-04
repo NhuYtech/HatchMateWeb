@@ -21,7 +21,6 @@ export interface DeviceItem {
   incubatingDay: number;
   totalIncubationDays: number;
   remainingDays: number;
-  hasCamera: boolean;
   lastSeen: string;
   eggCount?: number;
 }
@@ -34,14 +33,6 @@ export interface AlertItem {
   message: string;
   level: AlertLevel;
   timestamp: string;
-}
-
-export interface CameraItem {
-  id: string;
-  deviceName: string;
-  imageUrl?: string;
-  aiLabel: string | null;
-  capturedAt: string;
 }
 
 export interface ChartPoint {

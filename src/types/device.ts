@@ -12,7 +12,6 @@ export interface DeviceItem {
   incubatingDay: number;
   totalIncubationDays: number;
   remainingDays: number;
-  hasCamera: boolean;
   battery: number;
   wifi: number; // 1-5 signal strength
   lastSeen: string;

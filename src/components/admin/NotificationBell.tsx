@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, WifiOff, AlertTriangle, X, CheckCheck, PlusCircle, UserPlus } from "lucide-react";
+import { Bell, Wifi, WifiOff, AlertTriangle, X, CheckCheck, PlusCircle, UserPlus } from "lucide-react";
 import { ref, onValue } from "firebase/database";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db, rtdb } from "@/src/lib/firebase";
 
-type NotifType = "warning" | "offline" | "new_device" | "new_user";
+type NotifType = "warning" | "offline" | "online" | "new_device" | "new_user";
 
 interface NotifItem {
   id: string;
@@ -46,9 +46,15 @@ const TYPE_CONFIG: Record<NotifType, { icon: React.ReactNode; bg: string; badge:
   },
   offline: {
     icon: <WifiOff className="h-4 w-4" />,
-    bg: "bg-slate-100 text-slate-500",
-    badge: "bg-slate-100 text-slate-500",
-    label: "Offline",
+    bg: "bg-rose-100 text-rose-600",
+    badge: "bg-rose-100 text-rose-700",
+    label: "Mất kết nối",
+  },
+  online: {
+    icon: <Wifi className="h-4 w-4" />,
+    bg: "bg-emerald-100 text-emerald-600",
+    badge: "bg-emerald-100 text-emerald-700",
+    label: "Đã kết nối",
   },
   new_device: {
     icon: <PlusCircle className="h-4 w-4" />,
@@ -58,8 +64,8 @@ const TYPE_CONFIG: Record<NotifType, { icon: React.ReactNode; bg: string; badge:
   },
   new_user: {
     icon: <UserPlus className="h-4 w-4" />,
-    bg: "bg-emerald-100 text-emerald-600",
-    badge: "bg-emerald-100 text-emerald-700",
+    bg: "bg-purple-100 text-purple-600",
+    badge: "bg-purple-100 text-purple-700",
     label: "Người dùng mới",
   },
 };
@@ -80,7 +86,9 @@ export default function NotificationBell() {
     }
     return new Set();
   });
+
   const panelRef = useRef<HTMLDivElement>(null);
+  const deviceStateTracker = useRef<Record<string, { status: string; hasSensorError: boolean }>>({});
 
   // Sync readIds to localStorage
   useEffect(() => {
@@ -94,17 +102,17 @@ export default function NotificationBell() {
   }, [readIds]);
 
   const handleNotifClick = (notif: NotifItem) => {
-    // Mark as read (hide red dot, reduce unread count) without navigating away
+    // Mark as read without deleting item from history
     setReadIds((prev) => new Set([...prev, notif.id]));
   };
 
   const handleDismissNotif = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    // Explicitly delete notification item when X button is clicked
+    // Explicitly delete notification item only when user clicks X button
     setNotifs((prev) => prev.filter((n) => n.id !== id));
   };
 
-  // ── 1. Device alerts + new device detection ──
+  // ── 1. Device state transitions: Offline, Reconnected, Sensor Error ──
   useEffect(() => {
     const knownDeviceIds = new Set<string>();
     let initialized = false;
@@ -114,13 +122,12 @@ export default function NotificationBell() {
       const now = new Date();
 
       if (!snapshot.exists()) {
-        setNotifs((prev) => prev.filter((n) => n.type !== "warning" && n.type !== "offline" && n.type !== "new_device"));
         initialized = true;
         return;
       }
 
       const data = snapshot.val();
-      const alertNotifs: NotifItem[] = [];
+      const transitionNotifs: NotifItem[] = [];
       const newDeviceNotifs: NotifItem[] = [];
 
       Object.keys(data).forEach((key) => {
@@ -131,65 +138,108 @@ export default function NotificationBell() {
 
         const item = data[key];
         if (typeof item !== "object" || item === null) return;
+        const deviceName = item.name ?? key;
 
-        // Detect new devices (added after initial load)
+        // Detect new devices
         if (initialized && !knownDeviceIds.has(key)) {
           newDeviceNotifs.push({
             id: `new-device-${key}-${now.getTime()}`,
             type: "new_device",
             title: "Thiết bị mới được thêm",
-            message: `Máy "${item.name ?? key}" vừa được kết nối vào hệ thống.`,
+            message: `Máy "${deviceName}" vừa được kết nối vào hệ thống.`,
             timestamp: now,
           });
         }
         knownDeviceIds.add(key);
 
-        // Alert / offline
         const rawStatus = String(
           item.status ??
           (item.alert === "NORMAL" ? "online" : item.alert ? "warning" : "offline")
         ).toLowerCase();
 
-        if (rawStatus === "warning") {
-          const temp = item.telemetry?.temp ?? item.temperature ?? item.temp ?? "–";
-          const humi = item.telemetry?.humi ?? item.humidity ?? item.humi ?? "–";
-          alertNotifs.push({
-            id: `alert-${key}`,
-            type: "warning",
-            title: item.name ?? key,
-            message: `Chỉ số vượt ngưỡng: ${temp}°C, ${humi}% RH`,
-            timestamp: now,
-          });
-        } else if (rawStatus === "offline") {
-          alertNotifs.push({
-            id: `offline-${key}`,
+        const temp = item.telemetry?.temp ?? item.temperature ?? item.temp ?? 0;
+        const humi = item.telemetry?.humi ?? item.humidity ?? item.humi ?? 0;
+        const numTemp = Number(temp);
+        const numHumi = Number(humi);
+
+        const hasSensorError =
+          item.sensor_error === true ||
+          item.sensor_error === 1 ||
+          item.sensorError === true ||
+          item.telemetry?.sensor_error === true ||
+          item.telemetry?.sensorError === true ||
+          item.alert === "SENSOR_ERROR" ||
+          (rawStatus !== "offline" && (numTemp <= 0 || numHumi <= 0 || numTemp < 15 || numTemp > 60 || numHumi > 100));
+
+        const prev = deviceStateTracker.current[key];
+
+        // 1. Device lost connection event
+        if (rawStatus === "offline" && (!prev || prev.status !== "offline")) {
+          transitionNotifs.push({
+            id: `offline-${key}-${now.getTime()}`,
             type: "offline",
-            title: item.name ?? key,
-            message: "Thiết bị mất kết nối",
+            title: `Thiết bị ngắt kết nối · ${deviceName}`,
+            message: `Máy "${deviceName}" vừa mất kết nối nguồn điện hoặc gián đoạn mạng Wifi.`,
             timestamp: now,
           });
         }
+
+        // 2. Device reconnected event
+        if (rawStatus !== "offline" && prev && prev.status === "offline") {
+          transitionNotifs.push({
+            id: `reconnected-${key}-${now.getTime()}`,
+            type: "online",
+            title: `Thiết bị đã kết nối lại · ${deviceName}`,
+            message: `Máy "${deviceName}" đã khôi phục kết nối thành công với hệ thống.`,
+            timestamp: now,
+          });
+        }
+
+        // 3. Sensor error event
+        if (hasSensorError && (!prev || !prev.hasSensorError)) {
+          transitionNotifs.push({
+            id: `sensor-error-${key}-${now.getTime()}`,
+            type: "warning",
+            title: `Lỗi cảm biến · ${deviceName}`,
+            message: `Không nhận được tín hiệu cảm biến nhiệt độ/độ ẩm từ máy "${deviceName}". Vui lòng kiểm tra jack cắm.`,
+            timestamp: now,
+          });
+        }
+
+        // 4. Threshold warning event
+        if (rawStatus === "warning" && !hasSensorError && (!prev || prev.status !== "warning")) {
+          transitionNotifs.push({
+            id: `threshold-alert-${key}-${now.getTime()}`,
+            type: "warning",
+            title: `Cảnh báo chỉ số · ${deviceName}`,
+            message: `Chỉ số môi trường vượt ngưỡng an toàn: ${numTemp > 0 ? numTemp.toFixed(1) : "--"}°C, ${numHumi > 0 ? numHumi : "--"}% RH.`,
+            timestamp: now,
+          });
+        }
+
+        // Update state tracker
+        deviceStateTracker.current[key] = {
+          status: rawStatus,
+          hasSensorError,
+        };
       });
 
       initialized = true;
 
-      setNotifs((prev) => {
-        // For each newly constructed alertNotif, if it already exists in `prev`,
-        // preserve its original timestamp so we don't reset it to the current time.
-        const updatedAlertNotifs = alertNotifs.map((newNotif) => {
-          const existing = prev.find((n) => n.id === newNotif.id);
-          if (existing) {
-            return { ...newNotif, timestamp: existing.timestamp };
-          }
-          return newNotif;
-        });
+      // Merge newly generated notifications into persistent notifs list
+      if (newDeviceNotifs.length > 0 || transitionNotifs.length > 0) {
+        setNotifs((prevNotifs) => {
+          const prevMap = new Map(prevNotifs.map((n) => [n.id, n]));
 
-        // Remove stale alert/offline/new_device notifs, keep user notifs
-        const userNotifs = prev.filter((n) => n.type === "new_user");
-        const prevNewDevices = prev.filter((n) => n.type === "new_device");
-        const combined = [...newDeviceNotifs, ...updatedAlertNotifs, ...prevNewDevices, ...userNotifs];
-        return combined.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      });
+          [...newDeviceNotifs, ...transitionNotifs].forEach((newNotif) => {
+            if (!prevMap.has(newNotif.id)) {
+              prevMap.set(newNotif.id, newNotif);
+            }
+          });
+
+          return Array.from(prevMap.values()).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        });
+      }
     });
 
     return () => unsubscribe();

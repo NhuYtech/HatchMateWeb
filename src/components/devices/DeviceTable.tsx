@@ -2,8 +2,6 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import {
-  Camera,
-  CameraOff,
   Thermometer,
   Droplet,
   Download,
@@ -121,7 +119,7 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
   };
 
   const handleExport = () => {
-    const headers = ["Mã máy", "Tên máy", "Chủ sở hữu", "Trạng thái", "Chu kỳ", "Nhiệt độ (°C)", "Độ ẩm (%)", "Trạng thái Camera", "Cập nhật cuối"];
+    const headers = ["Mã máy", "Tên máy", "Chủ sở hữu", "Trạng thái", "Chu kỳ", "Nhiệt độ (°C)", "Độ ẩm (%)", "Cập nhật cuối"];
     const rows = devices.map(device => [
       device.id,
       device.name,
@@ -130,7 +128,6 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
       device.incubationStatus === "incubating" ? "Đang ấp" : (device.incubationStatus === "hatchingSoon" ? "Sắp nở" : "Tạm dừng"),
       device.temperature > 0 ? device.temperature.toFixed(1) : "--",
       device.humidity > 0 ? device.humidity.toString() : "--",
-      device.hasCamera ? "Online" : "Offline",
       device.lastSeen
     ]);
 
@@ -206,14 +203,13 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
               <th className="px-6 py-4">Chu kỳ ấp</th>
               <th className="px-6 py-4">Nhiệt độ</th>
               <th className="px-6 py-4">Độ ẩm</th>
-              <th className="px-6 py-4">Trạng thái Camera</th>
               <th className="px-6 py-4">Cập nhật cuối</th>
               <th className="px-6 py-4 text-center">Hành động</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {paginatedDevices.map((device, index) => {
-              const isBottomRow = index >= paginatedDevices.length - 3;
+              const isBottomRow = paginatedDevices.length > 3 && index >= paginatedDevices.length - 2;
               return (
                 <tr
                   key={device.id}
@@ -272,19 +268,6 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
                   )}
                 </td>
 
-                  {/* Camera */}
-                  <td className="px-6 py-4">
-                    {device.hasCamera ? (
-                      <span className="text-xs font-bold text-sky-700">
-                        Online
-                      </span>
-                    ) : (
-                      <span className="text-xs font-semibold text-slate-400">
-                        Offline
-                      </span>
-                    )}
-                  </td>
-
                 {/* Cập nhật cuối */}
                 <td className="px-6 py-4 text-xs text-slate-400 font-semibold">
                   {device.lastSeen}
@@ -292,7 +275,7 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
 
                 {/* Hành động */}
                 <td className="px-6 py-4 align-middle text-center">
-                  <div className="relative inline-block text-left">
+                  <div className={`relative inline-block text-left ${activeDropdownId === device.id ? "z-50" : ""}`}>
                     <button
                       type="button"
                       onClick={() => setActiveDropdownId(activeDropdownId === device.id ? null : device.id)}

@@ -88,7 +88,7 @@ export default function AdminLayoutWrapper({
         {/* Backdrop overlay for mobile sidebar */}
         {!collapsed && (
           <div
-            className="fixed inset-0 z-40 bg-black/40 transition-opacity md:hidden"
+            className="fixed inset-0 z-30 bg-black/40 transition-opacity md:hidden"
             onClick={() => setCollapsed(true)}
           />
         )}
@@ -96,6 +96,7 @@ export default function AdminLayoutWrapper({
         {/* Sidebar: Fixed width, height fills space under header, scrollable */}
         <AdminSidebar
           collapsed={collapsed}
+          onClose={() => setCollapsed(true)}
           onItemClick={() => {
             if (window.innerWidth < 1024) {
               setCollapsed(true);

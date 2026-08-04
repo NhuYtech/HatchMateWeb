@@ -11,12 +11,11 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { Users, Cpu, Camera, Calendar } from "lucide-react";
+import { Users, Cpu, Calendar } from "lucide-react";
 
 interface MonthlyMetricsBarChartProps {
   userCount?: number;
   deviceCount?: number;
-  cameraCount?: number;
   rawUsers?: any[];
   rawIncubators?: any[];
 }
@@ -36,7 +35,6 @@ function parseTimestamp(val: any): Date | null {
 export default function MonthlyMetricsBarChart({
   userCount = 6,
   deviceCount = 1,
-  cameraCount = 1,
   rawUsers = [],
   rawIncubators = [],
 }: MonthlyMetricsBarChartProps) {
@@ -73,7 +71,6 @@ export default function MonthlyMetricsBarChart({
     return weeks.map((w) => {
       let uCount = 0;
       let dCount = 0;
-      let cCount = 0;
 
       // 1. Calculate REAL user accounts created on/before this week's cutoff
       if (rawUsers.length > 0) {
@@ -97,27 +94,13 @@ export default function MonthlyMetricsBarChart({
         dCount = deviceCount;
       }
 
-      // 3. Calculate REAL cameras created on/before this week's cutoff
-      if (rawIncubators.length > 0) {
-        cCount = rawIncubators.filter((inc) => {
-          const hasCam = Boolean(inc.hasCamera || inc.control?.camera || inc.camera);
-          if (!hasCam) return false;
-          const t = parseTimestamp(inc.camera?.createdAt || inc.createdAt || inc.timestamp);
-          if (!t) return true;
-          return t.getTime() <= w.cutoff.getTime();
-        }).length;
-      } else {
-        cCount = cameraCount;
-      }
-
       return {
         period: w.period,
         users: uCount,
         devices: dCount,
-        cameras: cCount,
       };
     });
-  }, [currentYear, currentMonthNum, daysInMonth, rawUsers, rawIncubators, userCount, deviceCount, cameraCount]);
+  }, [currentYear, currentMonthNum, daysInMonth, rawUsers, rawIncubators, userCount, deviceCount]);
 
   return (
     <div className="rounded-[24px] border border-slate-200/80 bg-white/95 p-5 sm:p-6 shadow-sm min-w-0 overflow-hidden flex flex-col justify-between h-full">
@@ -188,13 +171,6 @@ export default function MonthlyMetricsBarChart({
                 radius={[6, 6, 0, 0]}
                 barSize={20}
               />
-              <Bar
-                dataKey="cameras"
-                name="Camera AI"
-                fill="#f59e0b"
-                radius={[6, 6, 0, 0]}
-                barSize={20}
-              />
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -219,16 +195,6 @@ export default function MonthlyMetricsBarChart({
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">TỔNG SỐ MÁY ẤP</span>
             <span className="text-sm font-extrabold text-indigo-950">{deviceCount} máy ấp</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-amber-50/60 border border-amber-100/60">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-700 shrink-0">
-            <Camera className="h-4 w-4" />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">CAMERA AI GIÁM SÁT</span>
-            <span className="text-sm font-extrabold text-amber-950">{cameraCount} camera</span>
           </div>
         </div>
       </div>

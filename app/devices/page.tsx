@@ -118,18 +118,29 @@ export default function DevicesPage() {
         const rawOwner = item.ownerEmail || ownerEmail;
         const resolvedOwner = usersMap[rawOwner.toLowerCase()] || rawOwner;
 
+        const rawStatus = String(item.status ?? (item.alert === "NORMAL" ? "online" : (item.alert ? "warning" : "offline"))).toLowerCase();
+        const hasSensorError =
+          item.sensor_error === true ||
+          item.sensor_error === 1 ||
+          item.sensorError === true ||
+          item.telemetry?.sensor_error === true ||
+          item.telemetry?.sensorError === true ||
+          item.alert === "SENSOR_ERROR" ||
+          (rawStatus !== "offline" && (temperature <= 0 || humidity <= 0 || temperature < 15 || temperature > 60 || humidity > 100));
+
+        const resolvedStatus = hasSensorError ? "warning" : (rawStatus as any);
+
         list.push({
           id: key,
           name: item.name ?? key,
           owner: resolvedOwner,
-          status: String(item.status ?? (item.alert === "NORMAL" ? "online" : (item.alert ? "warning" : "offline"))).toLowerCase() as any,
+          status: resolvedStatus,
           incubationStatus,
           temperature,
           humidity,
           incubatingDay,
           totalIncubationDays,
           remainingDays,
-          hasCamera: Boolean(item.hasCamera ?? item.control?.camera),
           battery: Number(item.battery ?? 100),
           wifi: Number(item.wifi ?? 5),
           lastSeen: item.lastSeen ?? "Vừa xong",

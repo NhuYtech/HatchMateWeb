@@ -9,7 +9,6 @@ import {
   Wifi,
   Bell,
   AlertTriangle,
-  Camera,
   Radio,
   Smartphone,
   ShieldAlert,
@@ -190,7 +189,6 @@ export default function AlertSettingsCard() {
     s.lowHumidityAlertEnabled,
     s.highHumidityAlertEnabled,
     s.deviceOfflineAlert,
-    s.cameraOfflineAlert,
     s.sensorNoResponseAlert,
   ].filter(Boolean).length;
 
@@ -338,12 +336,6 @@ export default function AlertSettingsCard() {
                 onToggle={() => toggle("deviceOfflineAlert")}
               />
               <ToggleRow
-                label="Camera bị mất kết nối"
-                description="Alert khi camera ngừng truyền ảnh"
-                enabled={s.cameraOfflineAlert}
-                onToggle={() => toggle("cameraOfflineAlert")}
-              />
-              <ToggleRow
                 label="Cảm biến không phản hồi"
                 description="Alert khi cảm biến ngừng gửi dữ liệu"
                 enabled={s.sensorNoResponseAlert}
@@ -357,12 +349,6 @@ export default function AlertSettingsCard() {
                 icon={<Wifi className="h-3 w-3" />}
                 label="Thiết bị"
                 active={s.deviceOfflineAlert}
-                colorOn="border-violet-100 bg-violet-50 text-violet-600"
-              />
-              <QuickChip
-                icon={<Camera className="h-3 w-3" />}
-                label="Camera"
-                active={s.cameraOfflineAlert}
                 colorOn="border-violet-100 bg-violet-50 text-violet-600"
               />
               <QuickChip

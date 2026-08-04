@@ -41,7 +41,8 @@ export default function LoginPage() {
       } else if (error.code === "auth/popup-blocked" || errStr.includes("popup-blocked")) {
         setErrorMsg("Trình duyệt đã chặn cửa sổ đăng nhập Google. Vui lòng cho phép popup để tiếp tục!");
       } else if (error.code === "auth/unauthorized-domain" || errStr.includes("unauthorized-domain")) {
-        setErrorMsg("Tên miền này chưa được cấu hình (Authorized Domain) trong Firebase Console.");
+        const domain = typeof window !== "undefined" ? window.location.hostname : "localhost";
+        setErrorMsg(`Tên miền "${domain}" chưa được thêm vào Danh sách Tên miền Được ủy quyền (Authorized Domains) trong Firebase Console -> Authentication -> Settings.`);
       } else if (error.code === "auth/network-request-failed" || errStr.includes("network-request-failed")) {
         setErrorMsg("Lỗi kết nối mạng. Vui lòng kiểm tra lại kết nối internet!");
       } else {

@@ -1,4 +1,4 @@
-import { ArrowRight, Camera, CameraOff } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { DeviceItem } from "../../types/dashboard";
 import Link from "next/link";
 
@@ -30,7 +30,6 @@ export default function DeviceOverviewTable({ devices }: DeviceOverviewTableProp
               <th className="pb-4 pt-2 font-semibold text-center">Độ ẩm</th>
               <th className="pb-4 pt-2 font-semibold text-center">Ngày ấp</th>
               <th className="pb-4 pt-2 font-semibold text-center">Còn lại</th>
-              <th className="pb-4 pt-2 font-semibold text-center">Trạng thái Camera</th>
               <th className="pb-4 pt-2 font-semibold text-center">Cập nhật cuối</th>
               <th className="pb-4 pt-2 font-semibold text-center">Hành động</th>
             </tr>
@@ -109,18 +108,6 @@ export default function DeviceOverviewTable({ devices }: DeviceOverviewTableProp
                       </span>
                     ) : (
                       <span className="text-slate-400">—</span>
-                    )}
-                  </td>
-                  {/* Camera */}
-                  <td className="py-4 align-middle text-center">
-                    {device.hasCamera ? (
-                      <span className="text-xs font-bold text-sky-700">
-                        Online
-                      </span>
-                    ) : (
-                      <span className="text-xs font-semibold text-slate-400">
-                        Offline
-                      </span>
                     )}
                   </td>
                   {/* Last Seen */}

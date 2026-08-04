@@ -59,7 +59,6 @@ export interface AlertSettings {
 
   // C. Connectivity / system alerts
   deviceOfflineAlert: boolean;
-  cameraOfflineAlert: boolean;
   sensorNoResponseAlert: boolean;
 
   // D. Notification channels

@@ -102,7 +102,6 @@ export const defaultAlertSettings: AlertSettings = {
   highHumidityAlertEnabled: false,
   highHumidityThreshold: 75,
   deviceOfflineAlert: true,
-  cameraOfflineAlert: true,
   sensorNoResponseAlert: true,
   pushNotificationEnabled: true,
   adminNotificationEnabled: true,

@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import StatCard from "@/src/components/dashboard/StatCard";
-import AiDetectionDonutChart from "@/src/components/dashboard/AiDetectionDonutChart";
 import IncubationStageBarChart from "@/src/components/dashboard/IncubationStageBarChart";
 import DeviceAlertOfflineBarChart from "@/src/components/reports/DeviceAlertOfflineBarChart";
 import ReportSummaryTable from "@/src/components/reports/ReportSummaryTable";
@@ -132,7 +130,6 @@ export default function ReportsPage() {
               incubatingDay,
               totalIncubationDays,
               remainingDays,
-              hasCamera: Boolean(item.hasCamera ?? item.control?.camera),
               lastSeen: item.lastSeen ?? "Vừa xong",
             });
           }
@@ -205,9 +202,8 @@ export default function ReportsPage() {
         </p>
       </div>
 
-      {/* HÀNG 1: Biểu đồ Vòng AI & Biểu đồ Cột Thông số Ấp 3 Giai đoạn */}
-      <section className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        <AiDetectionDonutChart />
+      {/* Biểu đồ Cột Thông số Ấp 3 Giai đoạn */}
+      <section className="w-full">
         <IncubationStageBarChart />
       </section>
 

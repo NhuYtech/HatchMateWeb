@@ -164,8 +164,7 @@ export default function AddDeviceModal({ isOpen, onClose, onSuccess }: AddDevice
         heater1: false,
         heater2: false,
         reset: false,
-        turner: false,
-        camera: false
+        turner: false
       },
       cycle: {
         isActive: false,
