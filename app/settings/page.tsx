@@ -388,11 +388,6 @@ function DeviceConfigurationContent() {
     } else if (action === "factoryreset") {
       actionTitle = "Khôi phục cài đặt gốc";
       actionMessage = "Đang tiến hành khôi phục cài đặt ban đầu cho lò ấp...";
-      successMessage = "Khôi phục cài đặt gốc hoàn tất!";
-    } else if (action === "capture") {
-      actionTitle = "Yêu cầu chụp ảnh";
-      actionMessage = `Đang gửi lệnh yêu cầu chụp ảnh tới máy ấp ${machineId}...`;
-      successMessage = "Yêu cầu chụp ảnh thành công! Hình ảnh mới sẽ sớm được tải lên.";
     }
 
     setPopupAlert({

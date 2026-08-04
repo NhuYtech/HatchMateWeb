@@ -8,16 +8,35 @@ import AnimatedBackground from "@/src/components/common/AnimatedBackground";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signInWithGoogle, authError } = useAuth();
+  const { currentUser, signInWithGoogle, authError } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(true);
 
   const displayError = authError || errorMsg;
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Redirect to dashboard if logged in with authorized admin account
+  useEffect(() => {
+    if (currentUser) {
+      router.replace("/dashboard");
+    }
+  }, [currentUser, router]);
+
+  useEffect(() => {
+    if (authError || errorMsg) {
+      setShowErrorModal(true);
+    }
+  }, [authError, errorMsg]);
+
+  const handleCloseModal = () => {
+    setShowErrorModal(false);
+    setErrorMsg(null);
+  };
 
   const handleGoogleLogin = async (e: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -31,7 +50,7 @@ export default function LoginPage() {
 
     try {
       await signInWithGoogle();
-      router.replace("/dashboard");
+      // AuthProvider will verify email and set currentUser, triggering redirect via useEffect
     } catch (error: any) {
       console.error("Firebase Google Auth Error:", error);
       
@@ -48,6 +67,7 @@ export default function LoginPage() {
       } else {
         setErrorMsg(`Đăng nhập thất bại: ${error.message || error.code}`);
       }
+    } finally {
       setIsLoading(false);
     }
   };
@@ -84,14 +104,12 @@ export default function LoginPage() {
       `}</style>
 
       {/* Decorative Floating Background Elements */}
-      {/* Top Left: Egg Outline */}
       <div className="absolute top-10 left-10 md:top-20 md:left-24 text-white/40 animate-float-slow">
         <svg width="80" height="100" viewBox="0 0 80 100" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M40 10C18 10 10 45 10 65C10 82 23 90 40 90C57 90 70 82 70 65C70 45 62 10 40 10Z" stroke="currentColor" strokeWidth="3" strokeDasharray="6 6" />
         </svg>
       </div>
 
-      {/* Top Right: Chick Face Outline */}
       <div className="absolute top-16 right-12 md:top-32 md:right-28 text-white/30 animate-float-medium hidden sm:block">
         <svg width="70" height="70" viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="35" cy="35" r="30" stroke="currentColor" strokeWidth="3" strokeDasharray="4 4" />
@@ -101,21 +119,17 @@ export default function LoginPage() {
         </svg>
       </div>
 
-      {/* Bottom Left: Another Egg */}
       <div className="absolute bottom-16 left-12 md:bottom-28 md:left-32 text-white/35 animate-float-medium hidden md:block">
         <svg width="60" height="75" viewBox="0 0 60 75" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M30 8C14 8 8 34 8 49C8 62 17 68 30 68C43 68 52 62 52 49C52 34 46 8 30 8Z" stroke="currentColor" strokeWidth="2.5" />
         </svg>
       </div>
 
-      {/* Bottom Right: Little Chick Footprints or Egg Shell */}
       <div className="absolute bottom-10 right-10 md:bottom-20 md:right-24 text-white/40 animate-float-slow">
         <svg width="90" height="90" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M20 55L35 70L50 55L65 70L80 55L90 75H10V55Z" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="8 4" />
         </svg>
       </div>
-
-
 
       {/* Main Login Card */}
       <div className="relative w-full max-w-[460px] mx-4 bg-white/95 rounded-[32px] shadow-[0_24px_70px_rgba(224,140,0,0.22)] border border-white/60 p-8 sm:p-10 md:p-12 z-10 backdrop-blur-md transition-all duration-500 hover:shadow-[0_30px_80px_rgba(224,140,0,0.3)] hover:scale-[1.01] flex flex-col items-center">
@@ -162,13 +176,6 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Error / Warning Alert */}
-        {displayError && (
-          <div className="w-full mb-6 p-3 rounded-2xl bg-orange-50 border border-orange-200/50 text-orange-700 text-xs font-semibold text-center select-none transition-all duration-300">
-            {displayError}
-          </div>
-        )}
-
         {/* Login Area / Action Button */}
         <div className="w-full flex flex-col items-center">
           <button
@@ -190,7 +197,6 @@ export default function LoginPage() {
               </>
             ) : (
               <>
-                {/* Official Google G Icon inside a white circle for contrast */}
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white shrink-0 shadow-sm transition-transform duration-300 group-hover:scale-105">
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path
@@ -215,7 +221,6 @@ export default function LoginPage() {
               </>
             )}
           </button>
-
         </div>
 
         {/* Footer info */}
@@ -225,6 +230,38 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Error Popup Modal */}
+      {displayError && showErrorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-sm bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-100 text-center flex flex-col items-center gap-4 animate-in zoom-in-95 duration-200">
+            {/* Warning Icon Badge */}
+            <div className="h-14 w-14 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shadow-xs">
+              <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+
+            {/* Title & Message */}
+            <div className="flex flex-col gap-2">
+              <h4 className="text-base font-extrabold text-slate-800 tracking-wide uppercase">
+                THÔNG BÁO QUYỀN TRUY CẬP
+              </h4>
+              <p className="text-xs text-slate-600 font-medium leading-relaxed px-2">
+                {displayError}
+              </p>
+            </div>
+
+            {/* Close Button */}
+            <button
+              onClick={handleCloseModal}
+              className="w-full mt-2 py-3 px-6 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-xs shadow-md hover:from-orange-600 hover:to-amber-600 hover:shadow-lg transition-all cursor-pointer active:scale-95"
+            >
+              Đã hiểu & Đóng
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

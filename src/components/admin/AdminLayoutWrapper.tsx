@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import DashboardTopbar from "./DashboardTopbar";
 import AdminSidebar from "./AdminSidebar";
-import { useAuth } from "@/src/components/AuthProvider";
+import { useAuth, ALLOWED_ADMIN_EMAILS } from "@/src/components/AuthProvider";
 import AnimatedBackground from "@/src/components/common/AnimatedBackground";
 
 export default function AdminLayoutWrapper({
@@ -44,6 +44,14 @@ export default function AdminLayoutWrapper({
     } else if (currentUser && isLoginPath) {
       setAuthorized(false);
       router.replace("/dashboard");
+    } else if (currentUser && currentUser.email) {
+      const userEmail = currentUser.email.toLowerCase().trim();
+      if (!ALLOWED_ADMIN_EMAILS.includes(userEmail)) {
+        setAuthorized(false);
+        router.replace("/");
+        return;
+      }
+      setAuthorized(true);
     } else {
       setAuthorized(true);
     }
@@ -104,7 +112,7 @@ export default function AdminLayoutWrapper({
           }}
         />
 
-        {/* Content: Fills remaining space, scrollable, restored warm gradient bg */}
+        {/* Content: Fills remaining space, scrollable */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 relative">
           <AnimatedBackground />
           <div className="mx-auto max-w-[1600px] w-full relative z-10">

@@ -14,7 +14,10 @@ export interface AuthUser {
 }
 
 export const ADMIN_EMAIL = "hnyhttt2211015@student.ctuet.edu.vn";
-export const OWNER_EMAIL = "huynhnhuy.tech@gmail.com";
+
+export const ALLOWED_ADMIN_EMAILS = [
+  ADMIN_EMAIL.toLowerCase(),
+];
 
 interface AuthContextType {
   currentUser: AuthUser | null;
@@ -37,16 +40,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (user) {
           const userEmail = user.email?.toLowerCase().trim();
-          const allowedAdminEmails = [ADMIN_EMAIL.toLowerCase(), OWNER_EMAIL.toLowerCase()];
-          if (!userEmail || !allowedAdminEmails.includes(userEmail)) {
+          if (!userEmail || !ALLOWED_ADMIN_EMAILS.includes(userEmail)) {
             console.warn(`[Auth] Access denied for ${userEmail}. Only Admin accounts are permitted on Web.`);
+            setCurrentUser(null);
+            setAuthError("Rất tiếc, chỉ tài khoản Quản trị viên mới có quyền đăng nhập vào hệ thống Web!");
             try {
               await firebaseLogout();
             } catch (e) {
               console.error("Firebase logout error:", e);
             }
-            setCurrentUser(null);
-            setAuthError("Rất tiếc, chỉ tài khoản Quản trị viên mới có quyền đăng nhập vào hệ thống Web!");
             setLoading(false);
             return;
           }
@@ -61,37 +63,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           // Sync online status and last active timestamp to Firestore
           try {
-            const userEmail = user.email?.toLowerCase().trim();
-            if (userEmail) {
-              const usersCol = collection(db, "users");
-              const q = query(usersCol, where("email", "==", userEmail));
-              const snap = await getDocs(q);
+            const usersCol = collection(db, "users");
+            const q = query(usersCol, where("email", "==", userEmail));
+            const snap = await getDocs(q);
 
-              const nowIso = new Date().toISOString();
-              if (!snap.empty) {
-                await Promise.all(
-                  snap.docs.map((docSnap) =>
-                    setDoc(doc(db, "users", docSnap.id), {
-                      isOnline: true,
-                      lastActiveAt: nowIso,
-                      fullName: user.displayName || docSnap.data().fullName,
-                      profilePicture: user.photoURL || docSnap.data().profilePicture,
-                    }, { merge: true })
-                  )
-                );
-              } else {
-                await setDoc(doc(db, "users", user.uid), {
-                  uid: user.uid,
-                  email: userEmail,
-                  fullName: user.displayName || "Người dùng",
-                  role: "admin",
-                  status: "active",
-                  isOnline: true,
-                  lastActiveAt: nowIso,
-                  createdAt: nowIso,
-                  profilePicture: user.photoURL || "",
-                }, { merge: true });
-              }
+            const nowIso = new Date().toISOString();
+            if (!snap.empty) {
+              await Promise.all(
+                snap.docs.map((docSnap) =>
+                  setDoc(doc(db, "users", docSnap.id), {
+                    isOnline: true,
+                    lastActiveAt: nowIso,
+                    fullName: user.displayName || docSnap.data().fullName,
+                    profilePicture: user.photoURL || docSnap.data().profilePicture,
+                  }, { merge: true })
+                )
+              );
+            } else {
+              await setDoc(doc(db, "users", user.uid), {
+                uid: user.uid,
+                email: userEmail,
+                fullName: user.displayName || "Người dùng",
+                role: "admin",
+                status: "active",
+                isOnline: true,
+                lastActiveAt: nowIso,
+                createdAt: nowIso,
+                profilePicture: user.photoURL || "",
+              }, { merge: true });
             }
           } catch (err) {
             console.error("Error updating online presence in Firestore:", err);
@@ -112,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isFirebaseConfigured) {
       throw new Error("Firebase chưa được cấu hình!");
     }
+    setAuthError(null);
     await firebaseSignInWithGoogle();
   };
 

@@ -70,8 +70,6 @@ export default function DashboardPage() {
             const temperature = Number(item.telemetry?.temp ?? item.temperature ?? 0);
             const humidity = Number(item.telemetry?.humi ?? item.humidity ?? 0);
             const incubatingDay = Number(item.telemetry?.day ?? item.incubatingDay ?? 0);
-            const eggCount = item.telemetry?.eggCount !== undefined ? Number(item.telemetry.eggCount) : 24;
-
             list.push({
               id: key,
               name: item.name ?? key,
@@ -83,7 +81,6 @@ export default function DashboardPage() {
               totalIncubationDays: 21,
               remainingDays: Math.max(0, 21 - incubatingDay),
               lastSeen: item.lastSeen ?? "Vừa xong",
-              eggCount,
             });
           }
         });
@@ -120,7 +117,6 @@ export default function DashboardPage() {
   }, []);
 
   const onlineCount = devices.filter((d) => d.status === "online").length;
-  const totalEggCount = devices.reduce((sum, d) => sum + (d.eggCount ?? 24), 0) || 24;
 
   return (
     <div className="grid gap-6">
@@ -144,9 +140,9 @@ export default function DashboardPage() {
           icon={<Activity className="h-5 w-5 text-emerald-600" />}
         />
         <StatCard
-          label="Số trứng đang ấp"
-          value={`${totalEggCount}`}
-          description="Tổng số trứng trong các trạm ấp"
+          label="Máy đang ấp"
+          value={`${kpi.incubatingDevices}`}
+          description="Số trạm đang chạy chu kỳ ấp"
           accent="temperature"
           icon={<Sparkles className="h-5 w-5 text-amber-600" />}
         />

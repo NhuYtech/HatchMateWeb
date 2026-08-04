@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
   allowedDevOrigins: [
+    "10.10.12.223",
+    "10.10.12.223:3000",
     "172.16.5.244",
     "172.16.5.244:3000",
     "10.10.4.20",

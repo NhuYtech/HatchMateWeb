@@ -22,7 +22,6 @@ export interface DeviceItem {
   totalIncubationDays: number;
   remainingDays: number;
   lastSeen: string;
-  eggCount?: number;
 }
 
 export interface AlertItem {

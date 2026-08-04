@@ -162,27 +162,7 @@ export default function AdminSidebar({ collapsed, onItemClick, onClose }: AdminS
         </nav>
       </div>
 
-      {/* System Footer Status */}
-      <div className="p-4 border-t border-slate-100/80 bg-slate-50/50 dark:bg-slate-800/30 shrink-0">
-        {!collapsed ? (
-          <div className="flex items-center gap-3 rounded-2xl bg-white p-3 border border-slate-100 shadow-xs">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 shrink-0 font-bold text-xs">
-              v1.2
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-slate-800 truncate">HatchMate OS</p>
-              <p className="text-[10px] font-medium text-emerald-600 flex items-center gap-1">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Hệ thống sẵn sàng
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-center py-1">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" title="Hệ thống sẵn sàng" />
-          </div>
-        )}
-      </div>
+
     </aside>
   );
 }
