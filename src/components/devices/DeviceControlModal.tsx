@@ -140,13 +140,23 @@ export default function DeviceControlModal({
     }
   };
 
-  const handleControlToggle = async (field: "fan" | "heater1" | "heater2" | "turner", currentVal: boolean) => {
+  const handleControlToggle = (field: "fan" | "heater1" | "heater2" | "turner", currentVal: boolean) => {
     if (opMode === "auto") return; // Only allowed in manual mode
-    try {
-      await set(ref(rtdb, `incubators/${deviceId}/control/${field}`), !currentVal);
-    } catch (err) {
+    const newVal = !currentVal;
+    // Optimistic UI update
+    if (field === "fan") setFan(newVal);
+    if (field === "heater1") setHeater1(newVal);
+    if (field === "heater2") setHeater2(newVal);
+    if (field === "turner") setTurner(newVal);
+
+    set(ref(rtdb, `incubators/${deviceId}/control/${field}`), newVal).catch((err) => {
       console.error(`Lỗi điều khiển thiết bị ${field}:`, err);
-    }
+      // Revert state on network error
+      if (field === "fan") setFan(currentVal);
+      if (field === "heater1") setHeater1(currentVal);
+      if (field === "heater2") setHeater2(currentVal);
+      if (field === "turner") setTurner(currentVal);
+    });
   };
 
   return createPortal(

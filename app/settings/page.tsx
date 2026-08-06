@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ref, onValue, set } from "firebase/database";
+import { ref, onValue, set, update } from "firebase/database";
 import { rtdb } from "@/src/lib/firebase";
 import {
   ChevronRight,
@@ -312,43 +312,33 @@ function DeviceConfigurationContent() {
       message: `Đang gửi thiết lập mới tới máy ấp ${machineId}...`
     });
     try {
-      // 1. Save settings
-      const settingsRef = ref(rtdb, `incubators/${machineId}/settings`);
-      await set(settingsRef, {
-        tempMin,
-        tempMax,
-        tempAlert,
-        tempAdjustment: tempOffset,
-        humidityMin: humiMin,
-        humidityMax: humiMax,
-        humidityAlert: humiAlert,
-        turnInterval,
-        servoAngle,
-        turnDuration
-      });
-
-      // 2. Save root attributes
-      const nameRef = ref(rtdb, `incubators/${machineId}/name`);
-      await set(nameRef, deviceName);
-
-      const modeRef = ref(rtdb, `incubators/${machineId}/mode`);
-      await set(modeRef, opMode);
-
-      // 3. Save cycle
-      const cycleRef = ref(rtdb, `incubators/${machineId}/cycle`);
-      await set(cycleRef, {
-        isActive: rawDbData?.cycle?.isActive ?? true,
-        startDate: startDate + (rawDbData?.cycle?.startDate ? rawDbData.cycle.startDate.substring(10) : "T12:22:02.200783"),
-        totalDays
-      });
-
-      // 4. Save telemetry (to sync the user-selected stage/day back to the device)
-      const telemetryRef = ref(rtdb, `incubators/${machineId}/telemetry`);
+      // Combined atomic update to send settings, name, mode, cycle, telemetry in 1 network RTT
       const phaseVal = currentPhase.includes("1") ? 1 : currentPhase.includes("2") ? 2 : 3;
-      await set(telemetryRef, {
-        ...(rawDbData?.telemetry || {}),
-        day: currentDay,
-        phase: phaseVal
+      await update(ref(rtdb, `incubators/${machineId}`), {
+        settings: {
+          tempMin,
+          tempMax,
+          tempAlert,
+          tempAdjustment: tempOffset,
+          humidityMin: humiMin,
+          humidityMax: humiMax,
+          humidityAlert: humiAlert,
+          turnInterval,
+          servoAngle,
+          turnDuration
+        },
+        name: deviceName,
+        mode: opMode,
+        cycle: {
+          isActive: rawDbData?.cycle?.isActive ?? true,
+          startDate: startDate + (rawDbData?.cycle?.startDate ? rawDbData.cycle.startDate.substring(10) : "T12:22:02.200783"),
+          totalDays
+        },
+        telemetry: {
+          ...(rawDbData?.telemetry || {}),
+          day: currentDay,
+          phase: phaseVal
+        }
       });
 
       setPopupAlert({
