@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import IncubationStageBarChart from "@/src/components/dashboard/IncubationStageBarChart";
-import DeviceAlertOfflineBarChart from "@/src/components/reports/DeviceAlertOfflineBarChart";
 import ReportSummaryTable from "@/src/components/reports/ReportSummaryTable";
 import ReportExportCard from "@/src/components/reports/ReportExportCard";
 import type { ReportSummaryItem } from "@/src/types/report";
@@ -213,16 +212,6 @@ export default function ReportsPage() {
           <ReportSummaryTable items={reportSummaryList} />
         </div>
         <ReportExportCard items={reportSummaryList} stats={reportStats} />
-      </section>
-
-      {/* HÀNG 3: Biểu đồ Cột Thống kê Cảnh báo & Mất kết nối Máy ấp */}
-      <section className="w-full">
-        <DeviceAlertOfflineBarChart
-          devices={devices}
-          onlineCount={onlineCount}
-          warningCount={warningCount}
-          offlineCount={offlineCount}
-        />
       </section>
     </div>
   );

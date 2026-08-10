@@ -12,12 +12,14 @@ import {
   Settings,
   MoreHorizontal,
   MoreVertical,
-  Sliders
+  Sliders,
+  Pencil
 } from "lucide-react";
 import { DeviceItem } from "@/src/types/device";
 import DataTablePagination from "@/src/components/common/DataTablePagination";
 import Link from "next/link";
 import DeviceControlModal from "./DeviceControlModal";
+import EditDeviceModal from "./EditDeviceModal";
 
 interface DeviceTableProps {
   devices: DeviceItem[];
@@ -31,6 +33,7 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
   const [pageSize, setPageSize] = useState(10);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [controlModalDevice, setControlModalDevice] = useState<{ id: string; name: string } | null>(null);
+  const [editModalDevice, setEditModalDevice] = useState<DeviceItem | null>(null);
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -292,6 +295,18 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
                           isBottomRow ? "bottom-full mb-1" : "top-full mt-1"
                         } z-[100] w-44 rounded-2xl border border-sky-100 bg-white p-1.5 shadow-2xl animate-in fade-in duration-100 text-left`}
                       >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveDropdownId(null);
+                            setEditModalDevice(device);
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-amber-700 transition cursor-pointer"
+                        >
+                          <Pencil className="h-4 w-4 text-amber-600" />
+                          <span>Sửa thông tin</span>
+                        </button>
+
                         <Link
                           href={`/settings?id=${device.id}`}
                           onClick={() => setActiveDropdownId(null)}
@@ -353,6 +368,17 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
           onClose={() => setControlModalDevice(null)}
           deviceId={controlModalDevice.id}
           deviceName={controlModalDevice.name}
+        />
+      )}
+
+      {editModalDevice && (
+        <EditDeviceModal
+          isOpen={!!editModalDevice}
+          onClose={() => setEditModalDevice(null)}
+          onSuccess={() => {
+            if (onRefresh) onRefresh();
+          }}
+          device={editModalDevice}
         />
       )}
     </div>
