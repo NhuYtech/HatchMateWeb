@@ -78,6 +78,43 @@ export default function DevicesPage() {
     return () => unsubscribe();
   }, []);
 
+  const formatLastSeenTime = (lastSeenVal: any) => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    if (!lastSeenVal) {
+      return `${pad(now.getHours())}:${pad(now.getMinutes())} · ${pad(now.getDate())}/${pad(now.getMonth() + 1)}`;
+    }
+
+    let date: Date;
+    if (typeof lastSeenVal === "number") {
+      date = new Date(lastSeenVal);
+    } else if (typeof lastSeenVal === "string") {
+      const parsed = Date.parse(lastSeenVal);
+      if (!isNaN(parsed)) {
+        date = new Date(parsed);
+      } else {
+        return lastSeenVal;
+      }
+    } else {
+      date = new Date();
+    }
+
+    const diffMs = now.getTime() - date.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+
+    if (diffMin < 1) return "Vừa xong";
+    if (diffMin < 60) return `${diffMin} phút trước`;
+
+    const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    if (isToday) return time;
+    return `${time} · ${pad(date.getDate())}/${pad(date.getMonth() + 1)}`;
+  };
+
   // Map snapshot value into DeviceItem array
   const mapDataToDevices = (data: any): DeviceItem[] => {
     const list: DeviceItem[] = [];
@@ -90,13 +127,11 @@ export default function DevicesPage() {
 
       const item = data[key];
       if (typeof item === "object" && item !== null) {
-        const temperature = item.telemetry?.temp !== undefined
-          ? Number(item.telemetry.temp)
-          : (item.temperature !== undefined ? Number(item.temperature) : Number(item.temp ?? 0));
+        const tempRaw = item.telemetry?.temp ?? item.telemetry?.temperature ?? item.sensors?.temp ?? item.temperature ?? item.temp;
+        const temperature = tempRaw !== undefined && tempRaw !== null ? Number(tempRaw) : 0;
 
-        const humidity = item.telemetry?.humi !== undefined
-          ? Number(item.telemetry.humi)
-          : (item.humidity !== undefined ? Number(item.humidity) : Number(item.humi ?? 0));
+        const humiRaw = item.telemetry?.humi ?? item.telemetry?.humidity ?? item.sensors?.humi ?? item.sensors?.humidity ?? item.humidity ?? item.humi;
+        const humidity = humiRaw !== undefined && humiRaw !== null ? Number(humiRaw) : 0;
 
         const incubatingDay = item.telemetry?.day !== undefined
           ? Number(item.telemetry.day)
@@ -129,6 +164,7 @@ export default function DevicesPage() {
           (rawStatus !== "offline" && (temperature <= 0 || humidity <= 0 || temperature < 15 || temperature > 60 || humidity > 100));
 
         const resolvedStatus = hasSensorError ? "warning" : (rawStatus as any);
+        const lastSeenFormatted = formatLastSeenTime(item.lastSeen ?? item.updatedAt ?? item.telemetry?.updatedAt);
 
         list.push({
           id: key,
@@ -143,7 +179,7 @@ export default function DevicesPage() {
           remainingDays,
           battery: Number(item.battery ?? 100),
           wifi: Number(item.wifi ?? 5),
-          lastSeen: item.lastSeen ?? "Vừa xong",
+          lastSeen: lastSeenFormatted,
         });
       }
     });

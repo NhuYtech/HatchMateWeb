@@ -202,7 +202,6 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
               <th className="px-6 py-4">Mã máy</th>
               <th className="px-6 py-4">Tên máy</th>
               <th className="px-6 py-4">Chủ sở hữu</th>
-              <th className="px-6 py-4">Trạng thái</th>
               <th className="px-6 py-4">Chu kỳ ấp</th>
               <th className="px-6 py-4">Nhiệt độ</th>
               <th className="px-6 py-4">Độ ẩm</th>
@@ -235,11 +234,6 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
                 {/* Chủ sở hữu */}
                 <td className="px-6 py-4">
                   <span className="text-xs text-slate-700 font-medium">{device.owner}</span>
-                </td>
-
-                {/* Trạng thái */}
-                <td className="px-6 py-4">
-                  {getStatusBadge(device.status)}
                 </td>
 
                 {/* Chu kỳ ấp */}

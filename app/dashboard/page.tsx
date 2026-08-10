@@ -123,28 +123,14 @@ export default function DashboardPage() {
       {/* Welcome Header */}
       <WelcomeBanner summary={kpi} />
 
-      {/* 4 Thẻ KPI Thống Kê Tổng Quan */}
-      <section className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 2 Thẻ KPI Thống Kê Tổng Quan */}
+      <section className="grid gap-4 grid-cols-1 sm:grid-cols-2">
         <StatCard
           label="Tổng số máy ấp"
           value={`${kpi.totalDevices}`}
           description="Tổng số trạm ấp đang quản lý"
           accent="default"
           icon={<Cpu className="h-5 w-5 text-indigo-600" />}
-        />
-        <StatCard
-          label="Thiết bị online"
-          value={`${onlineCount}`}
-          description="Kết nối hoạt động ổn định"
-          accent="success"
-          icon={<Activity className="h-5 w-5 text-emerald-600" />}
-        />
-        <StatCard
-          label="Máy đang ấp"
-          value={`${kpi.incubatingDevices}`}
-          description="Số trạm đang chạy chu kỳ ấp"
-          accent="temperature"
-          icon={<Sparkles className="h-5 w-5 text-amber-600" />}
         />
         <StatCard
           label="Tài khoản người dùng"

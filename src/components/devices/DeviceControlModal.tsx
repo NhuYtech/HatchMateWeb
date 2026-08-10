@@ -254,7 +254,7 @@ export default function DeviceControlModal({
                       <Wind className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-800 uppercase tracking-wide">Quạt thông gió</p>
+                      <p className="text-xs font-bold text-slate-800 uppercase tracking-wide">QUẠT</p>
                       <p className="text-[10px] text-slate-400 font-extrabold mt-0.5 uppercase tracking-wide">
                         Trạng thái: {fan ? <span className="text-emerald-600">Bật</span> : "Tắt"}
                       </p>
@@ -326,7 +326,7 @@ export default function DeviceControlModal({
                       <RefreshCw className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-800 uppercase tracking-wide">Khay đảo trứng</p>
+                      <p className="text-xs font-bold text-slate-800 uppercase tracking-wide">KHAY</p>
                       <p className="text-[10px] text-slate-400 font-extrabold mt-0.5 uppercase tracking-wide">
                         Trạng thái: {turner ? <span className="text-emerald-600">Bật</span> : "Tắt"}
                       </p>
