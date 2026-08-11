@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Cpu, Tag, AlertCircle, User, Save } from "lucide-react";
-import { ref, update, get } from "firebase/database";
+import { X, Cpu, Tag, AlertCircle, User } from "lucide-react";
+import { ref, update, get, child } from "firebase/database";
 import { collection, getDocs } from "firebase/firestore";
 import { rtdb, db } from "@/src/lib/firebase";
 import type { DeviceItem } from "@/src/types/device";
@@ -54,22 +54,28 @@ export default function EditDeviceModal({ isOpen, onClose, onSuccess, device }: 
           setUsers(list);
 
           // 2. Fetch device details from Firebase RTDB
-          const deviceRef = ref(rtdb, `incubators/${device.id}`);
-          const snapshot = await get(deviceRef);
+          const incubatorsRef = ref(rtdb, "incubators");
+          const snapshot = await get(incubatorsRef);
           if (snapshot.exists()) {
-            const data = snapshot.val();
-            setDeviceName(data.name || device.name);
+            const allIncubators = snapshot.val();
+            const data = allIncubators ? allIncubators[device.id] : null;
+            if (data) {
+              setDeviceName(data.name || device.name);
 
-            const currentOwner = data.ownerEmail || device.owner;
-            const matchedUser = list.find(
-              (u) => u.email.toLowerCase() === currentOwner.toLowerCase() || u.fullName === currentOwner
-            );
-            if (matchedUser) {
-              setSelectedUserEmail(matchedUser.email);
-            } else if (list.length > 0) {
-              setSelectedUserEmail(list[0].email);
+              const currentOwner = data.ownerEmail || device.owner;
+              const matchedUser = list.find(
+                (u) => u.email.toLowerCase() === currentOwner.toLowerCase() || u.fullName === currentOwner
+              );
+              if (matchedUser) {
+                setSelectedUserEmail(matchedUser.email);
+              } else if (list.length > 0) {
+                setSelectedUserEmail(list[0].email);
+              } else {
+                setSelectedUserEmail(currentOwner);
+              }
             } else {
-              setSelectedUserEmail(currentOwner);
+              setDeviceName(device.name);
+              setSelectedUserEmail(device.owner);
             }
           } else {
             setDeviceName(device.name);
@@ -95,12 +101,31 @@ export default function EditDeviceModal({ isOpen, onClose, onSuccess, device }: 
 
   if (!isOpen || !mounted || !device) return null;
 
-  const validateForm = (): boolean => {
+  const validateForm = async (): Promise<boolean> => {
     const newErrors: { [key: string]: string } = {};
 
     // Device Name Validation
-    if (!deviceName.trim()) {
+    const nameTrimmed = deviceName.trim();
+    if (!nameTrimmed) {
       newErrors.deviceName = "Tên thiết bị không được để trống";
+    } else {
+      try {
+        const incubatorsRef = ref(rtdb, "incubators");
+        const snapshot = await get(incubatorsRef);
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const isDuplicateName = Object.keys(data).some((key) => {
+            if (key === device.id) return false; // Ignore current device being edited
+            const inc = data[key];
+            return inc && inc.name && String(inc.name).trim().toLowerCase() === nameTrimmed.toLowerCase();
+          });
+          if (isDuplicateName) {
+            newErrors.deviceName = "Tên thiết bị này đã tồn tại trên hệ thống";
+          }
+        }
+      } catch (err) {
+        console.error("Lỗi kiểm tra trùng lặp tên thiết bị:", err);
+      }
     }
 
     setErrors(newErrors);
@@ -111,13 +136,15 @@ export default function EditDeviceModal({ isOpen, onClose, onSuccess, device }: 
     e.preventDefault();
     setLoading(true);
 
-    if (!validateForm()) {
+    const isValid = await validateForm();
+    if (!isValid) {
       setLoading(false);
       return;
     }
 
     try {
-      const deviceRef = ref(rtdb, `incubators/${device.id}`);
+      const incubatorsRef = ref(rtdb, "incubators");
+      const deviceRef = child(incubatorsRef, device.id);
       await update(deviceRef, {
         name: deviceName.trim(),
         ownerEmail: selectedUserEmail.trim(),
@@ -250,16 +277,14 @@ export default function EditDeviceModal({ isOpen, onClose, onSuccess, device }: 
               {loading ? (
                 <span>Đang lưu...</span>
               ) : (
-                <>
-                  <Save className="h-4 w-4" />
-                  <span>Lưu thay đổi</span>
-                </>
+                <span>Lưu thay đổi</span>
               )}
             </button>
           </div>
         </form>
       </div>
-    </div>,
+    </div>
+    ,
     document.body
   );
 }

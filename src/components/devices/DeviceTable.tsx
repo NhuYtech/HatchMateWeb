@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Thermometer,
   Droplet,
@@ -35,18 +36,64 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
   const [controlModalDevice, setControlModalDevice] = useState<{ id: string; name: string } | null>(null);
   const [editModalDevice, setEditModalDevice] = useState<DeviceItem | null>(null);
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Close dropdown on outside click or scroll/resize
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setActiveDropdownId(null);
+        setDropdownPos(null);
       }
     }
+    function handleScrollOrResize() {
+      if (activeDropdownId) {
+        setActiveDropdownId(null);
+        setDropdownPos(null);
+      }
+    }
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    window.addEventListener("scroll", handleScrollOrResize, true);
+    window.addEventListener("resize", handleScrollOrResize);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
+  }, [activeDropdownId]);
+
+  const handleToggleDropdown = (e: React.MouseEvent<HTMLButtonElement>, deviceId: string) => {
+    e.stopPropagation();
+    if (activeDropdownId === deviceId) {
+      setActiveDropdownId(null);
+      setDropdownPos(null);
+    } else {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const menuHeight = 180;
+      const openUpward = spaceBelow < menuHeight && rect.top > menuHeight;
+
+      if (openUpward) {
+        setDropdownPos({
+          bottom: window.innerHeight - rect.top + 6,
+          right: window.innerWidth - rect.right,
+        });
+      } else {
+        setDropdownPos({
+          top: rect.bottom + 6,
+          right: window.innerWidth - rect.right,
+        });
+      }
+      setActiveDropdownId(deviceId);
+    }
+  };
 
   // Reset to page 1 if devices list changes (e.g. filtered)
   const [prevDevices, setPrevDevices] = useState(devices);
@@ -171,6 +218,8 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
 
   const paginatedDevices = devices.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  const activeDevice = paginatedDevices.find((d) => d.id === activeDropdownId);
+
   return (
     <div className="rounded-[24px] border border-sky-100/80 bg-white shadow-sm shadow-sky-100/10 overflow-hidden">
 
@@ -211,7 +260,6 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
           </thead>
           <tbody className="divide-y divide-slate-100">
             {paginatedDevices.map((device, index) => {
-              const isBottomRow = paginatedDevices.length > 3 && index >= paginatedDevices.length - 2;
               return (
                 <tr
                   key={device.id}
@@ -272,72 +320,14 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
 
                 {/* Hành động */}
                 <td className="px-6 py-4 align-middle text-center">
-                  <div className={`relative inline-block text-left ${activeDropdownId === device.id ? "z-50" : ""}`}>
-                    <button
-                      type="button"
-                      onClick={() => setActiveDropdownId(activeDropdownId === device.id ? null : device.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-sky-50 hover:text-sky-600 transition active:scale-95 duration-100 cursor-pointer"
-                      title="Tác vụ"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
-
-                    {activeDropdownId === device.id && (
-                      <div 
-                        ref={dropdownRef}
-                        className={`absolute right-0 ${
-                          isBottomRow ? "bottom-full mb-1" : "top-full mt-1"
-                        } z-[100] w-44 rounded-2xl border border-sky-100 bg-white p-1.5 shadow-2xl animate-in fade-in duration-100 text-left`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveDropdownId(null);
-                            setEditModalDevice(device);
-                          }}
-                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-amber-700 transition cursor-pointer"
-                        >
-                          <Pencil className="h-4 w-4 text-amber-600" />
-                          <span>Sửa thông tin</span>
-                        </button>
-
-                        <Link
-                          href={`/settings?id=${device.id}`}
-                          onClick={() => setActiveDropdownId(null)}
-                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition cursor-pointer"
-                        >
-                          <Sliders className="h-4 w-4 text-sky-600" />
-                          <span>Cấu hình máy</span>
-                        </Link>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveDropdownId(null);
-                            setControlModalDevice({ id: device.id, name: device.name });
-                          }}
-                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition cursor-pointer"
-                        >
-                          <Settings className="h-4 w-4 text-slate-500" />
-                          <span>Điều khiển máy</span>
-                        </button>
-
-                        <div className="my-1 border-t border-slate-100" />
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveDropdownId(null);
-                            if (onDeleteDevice) onDeleteDevice(device.id, device.name);
-                          }}
-                          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4 text-rose-500" />
-                          <span>Xóa máy ấp</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => handleToggleDropdown(e, device.id)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-sky-50 hover:text-sky-600 transition active:scale-95 duration-100 cursor-pointer"
+                    title="Tác vụ"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
                 </td>
               </tr>
             );
@@ -374,6 +364,74 @@ export default function DeviceTable({ devices, onAddDevice, onRefresh, onDeleteD
           }}
           device={editModalDevice}
         />
+      )}
+
+      {/* Dropdown Menu via Portal */}
+      {mounted && activeDevice && dropdownPos && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: "fixed",
+            top: dropdownPos.top !== undefined ? `${dropdownPos.top}px` : undefined,
+            bottom: dropdownPos.bottom !== undefined ? `${dropdownPos.bottom}px` : undefined,
+            right: `${dropdownPos.right}px`,
+          }}
+          className="z-[9999] w-44 rounded-2xl border border-sky-100 bg-white p-1.5 shadow-2xl animate-in fade-in duration-100 text-left"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setActiveDropdownId(null);
+              setDropdownPos(null);
+              setEditModalDevice(activeDevice);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-amber-700 transition cursor-pointer"
+          >
+            <Pencil className="h-4 w-4 text-amber-600" />
+            <span>Sửa thông tin</span>
+          </button>
+
+          <Link
+            href={`/settings?id=${activeDevice.id}`}
+            onClick={() => {
+              setActiveDropdownId(null);
+              setDropdownPos(null);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition cursor-pointer"
+          >
+            <Sliders className="h-4 w-4 text-sky-600" />
+            <span>Cấu hình máy</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveDropdownId(null);
+              setDropdownPos(null);
+              setControlModalDevice({ id: activeDevice.id, name: activeDevice.name });
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition cursor-pointer"
+          >
+            <Settings className="h-4 w-4 text-slate-500" />
+            <span>Điều khiển máy</span>
+          </button>
+
+          <div className="my-1 border-t border-slate-100" />
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveDropdownId(null);
+              setDropdownPos(null);
+              if (onDeleteDevice) onDeleteDevice(activeDevice.id, activeDevice.name);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+          >
+            <Trash2 className="h-4 w-4 text-rose-500" />
+            <span>Xóa máy ấp</span>
+          </button>
+        </div>,
+        document.body
       )}
     </div>
   );

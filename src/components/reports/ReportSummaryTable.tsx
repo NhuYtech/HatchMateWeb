@@ -4,8 +4,8 @@ import React, { useState, useEffect } from "react";
 import { MoreHorizontal, Thermometer, Droplet, X, Calendar, Clock, Cpu } from "lucide-react";
 import { ReportSummaryItem } from "@/src/types/report";
 import DataTablePagination from "@/src/components/common/DataTablePagination";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { createPortal } from "react-dom";
+import DeviceRealtimeModalCharts from "./DeviceRealtimeModalCharts";
 
 interface ReportSummaryTableProps {
   items: ReportSummaryItem[];
@@ -21,17 +21,7 @@ export default function ReportSummaryTable({ items }: ReportSummaryTableProps) {
     setMounted(true);
   }, []);
 
-  const generateTrendData = (avgTemp: number, avgHumi: number) => {
-    return [
-      { date: "13/07", avgTemperature: Number(Math.max(30, avgTemp - 0.3).toFixed(1)), avgHumidity: Math.max(0, avgHumi - 1) },
-      { date: "14/07", avgTemperature: Number(Math.max(30, avgTemp - 0.2).toFixed(1)), avgHumidity: Math.max(0, avgHumi + 2) },
-      { date: "15/07", avgTemperature: Number(Math.max(30, avgTemp - 0.1).toFixed(1)), avgHumidity: Math.max(0, avgHumi - 2) },
-      { date: "16/07", avgTemperature: avgTemp, avgHumidity: avgHumi },
-      { date: "17/07", avgTemperature: Number(Math.max(30, avgTemp + 0.1).toFixed(1)), avgHumidity: Math.max(0, avgHumi - 1) },
-      { date: "18/07", avgTemperature: Number(Math.max(30, avgTemp - 0.1).toFixed(1)), avgHumidity: Math.max(0, avgHumi + 1) },
-      { date: "19/07", avgTemperature: avgTemp, avgHumidity: avgHumi },
-    ];
-  };
+
 
   // Reset to page 1 if items list changes
   const [prevItems, setPrevItems] = useState(items);
@@ -219,76 +209,13 @@ export default function ReportSummaryTable({ items }: ReportSummaryTableProps) {
               </div>
             </div>
 
-            {/* Custom Trend Charts Section inside modal */}
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Temperature Trend Area Chart */}
-              <div className="rounded-[24px] border border-sky-100 bg-slate-50/40 p-4 min-w-0 overflow-hidden">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Thermometer className="h-4 w-4 text-orange-500" />
-                    <h4 className="font-bold text-sky-950 text-sm">Nhiệt độ 7 ngày qua (°C)</h4>
-                  </div>
-                </div>
-                <div className="h-[200px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={generateTrendData(selectedItem.avgTemperature, selectedItem.avgHumidity)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="modalTempGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#f97316" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#f97316" stopOpacity={0.0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#94a3b8" fontSize={10} domain={[30, 42]} tickLine={false} axisLine={false} />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: "#ffffff", 
-                          borderRadius: "12px", 
-                          border: "1px solid #e2e8f0", 
-                          boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)"
-                        }}
-                      />
-                      <Area type="monotone" dataKey="avgTemperature" name="Nhiệt độ" stroke="#f97316" strokeWidth={2} fillOpacity={1} fill="url(#modalTempGradient)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Humidity Trend Area Chart */}
-              <div className="rounded-[24px] border border-sky-100 bg-slate-50/40 p-4 min-w-0 overflow-hidden">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Droplet className="h-4 w-4 text-blue-500" />
-                    <h4 className="font-bold text-sky-950 text-sm">Độ ẩm 7 ngày qua (%)</h4>
-                  </div>
-                </div>
-                <div className="h-[200px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={generateTrendData(selectedItem.avgTemperature, selectedItem.avgHumidity)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="modalHumiGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#94a3b8" fontSize={10} domain={[40, 80]} tickLine={false} axisLine={false} />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: "#ffffff", 
-                          borderRadius: "12px", 
-                          border: "1px solid #e2e8f0", 
-                          boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)"
-                        }}
-                      />
-                      <Area type="monotone" dataKey="avgHumidity" name="Độ ẩm" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#modalHumiGradient)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
+            {/* Realtime Temperature & Humidity Fluctuation Stream Charts */}
+            <DeviceRealtimeModalCharts
+              deviceId={selectedItem.deviceId}
+              deviceName={selectedItem.deviceName}
+              initialTemp={selectedItem.avgTemperature}
+              initialHumi={selectedItem.avgHumidity}
+            />
           </div>
         </div>,
         document.body

@@ -131,11 +131,6 @@ export default function NotificationBell() {
       const newDeviceNotifs: NotifItem[] = [];
 
       Object.keys(data).forEach((key) => {
-        const lowerKey = key.trim().toLowerCase();
-        if (lowerKey === "matg02" || lowerKey === "mayap01" || lowerKey === "mayap02") {
-          return;
-        }
-
         const item = data[key];
         if (typeof item !== "object" || item === null) return;
         const deviceName = item.name ?? key;

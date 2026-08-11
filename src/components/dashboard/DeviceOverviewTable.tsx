@@ -7,10 +7,7 @@ interface DeviceOverviewTableProps {
 }
 
 export default function DeviceOverviewTable({ devices }: DeviceOverviewTableProps) {
-  const filteredDevices = devices.filter((device) => {
-    const id = device.id.trim().toLowerCase();
-    return id !== "matg02" && id !== "mayap01" && id !== "mayap02";
-  });
+  const filteredDevices = devices;
 
   return (
     <section className="rounded-[24px] border border-slate-200/80 bg-white/95 p-4 sm:p-6 shadow-sm transition-all duration-300 hover:shadow-md min-w-0 overflow-hidden">

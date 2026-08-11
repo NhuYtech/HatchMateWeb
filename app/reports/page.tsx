@@ -126,11 +126,6 @@ export default function ReportsPage() {
         const list: DeviceItem[] = [];
 
         Object.keys(data).forEach((key) => {
-          const lowerKey = key.trim().toLowerCase();
-          if (lowerKey === "matg02" || lowerKey === "mayap01" || lowerKey === "mayap02") {
-            return;
-          }
-
           const item = data[key];
           if (typeof item === "object" && item !== null) {
             const tempRaw = item.telemetry?.temp ?? item.telemetry?.temperature ?? item.sensors?.temp ?? item.temperature ?? item.temp;

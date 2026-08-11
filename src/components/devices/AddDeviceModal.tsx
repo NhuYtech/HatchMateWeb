@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Cpu, KeyRound, Tag, Calendar, AlertCircle, User } from "lucide-react";
-import { ref, set, get } from "firebase/database";
+import { X, Cpu, Tag, Calendar, AlertCircle, User } from "lucide-react";
+import { ref, set, get, child } from "firebase/database";
 import { collection, getDocs } from "firebase/firestore";
 import { rtdb, db } from "@/src/lib/firebase";
 
@@ -16,7 +16,6 @@ interface AddDeviceModalProps {
 export default function AddDeviceModal({ isOpen, onClose, onSuccess }: AddDeviceModalProps) {
   const [deviceId, setDeviceId] = useState("");
   const [deviceName, setDeviceName] = useState("");
-  const [pinCode, setPinCode] = useState("");
   const [eggType, setEggType] = useState("chicken"); // chicken (21), duck (28), pigeon (18), custom
   const [customDays, setCustomDays] = useState("21");
   const [users, setUsers] = useState<{ email: string; fullName: string; uid: string }[]>([]);
@@ -75,7 +74,6 @@ export default function AddDeviceModal({ isOpen, onClose, onSuccess }: AddDevice
     if (isOpen) {
       setDeviceId("");
       setDeviceName("");
-      setPinCode("");
       setEggType("chicken");
       setCustomDays("21");
       setErrors({});
@@ -83,15 +81,6 @@ export default function AddDeviceModal({ isOpen, onClose, onSuccess }: AddDevice
   }, [isOpen]);
 
   if (!isOpen || !mounted) return null;
-
-  // Helper to generate a random 6-digit PIN
-  const handleGeneratePin = () => {
-    const randomPin = Math.floor(100000 + Math.random() * 900000).toString();
-    setPinCode(randomPin);
-    if (errors.pinCode) {
-      setErrors((prev) => ({ ...prev, pinCode: "" }));
-    }
-  };
 
   const validateForm = async (): Promise<boolean> => {
     const newErrors: { [key: string]: string } = {};
@@ -102,29 +91,41 @@ export default function AddDeviceModal({ isOpen, onClose, onSuccess }: AddDevice
       newErrors.deviceId = "Mã thiết bị không được để trống";
     } else if (!/^[a-zA-Z0-9_-]+$/.test(idTrimmed)) {
       newErrors.deviceId = "Mã thiết bị chỉ chứa chữ cái, số, dấu gạch ngang (-) và gạch dưới (_)";
-    } else {
-      // Check if device ID already exists in Firebase RTDB
-      try {
-        const deviceRef = ref(rtdb, `incubators/${idTrimmed}`);
-        const snapshot = await get(deviceRef);
-        if (snapshot.exists()) {
-          newErrors.deviceId = "Mã thiết bị này đã tồn tại trên hệ thống";
-        }
-      } catch (err) {
-        console.error("Lỗi kiểm tra trùng lặp ID:", err);
-      }
     }
 
     // 2. Device Name Validation
-    if (!deviceName.trim()) {
+    const nameTrimmed = deviceName.trim();
+    if (!nameTrimmed) {
       newErrors.deviceName = "Tên thiết bị không được để trống";
     }
 
-    // 3. PIN Code Validation
-    if (!pinCode.trim()) {
-      newErrors.pinCode = "Mã PIN kích hoạt không được để trống";
-    } else if (!/^\d{6}$/.test(pinCode.trim())) {
-      newErrors.pinCode = "Mã PIN phải chứa đúng 6 chữ số";
+    // 3. Combined check against Firebase RTDB incubators node for duplicate ID and Name
+    if ((!newErrors.deviceId && idTrimmed) || (!newErrors.deviceName && nameTrimmed)) {
+      try {
+        const incubatorsRef = ref(rtdb, "incubators");
+        const snapshot = await get(incubatorsRef);
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+
+          // Check duplicate ID
+          if (!newErrors.deviceId && idTrimmed && data && data[idTrimmed]) {
+            newErrors.deviceId = "Mã thiết bị này đã tồn tại trên hệ thống";
+          }
+
+          // Check duplicate Name
+          if (!newErrors.deviceName && nameTrimmed && data) {
+            const isDuplicateName = Object.keys(data).some((key) => {
+              const inc = data[key];
+              return inc && inc.name && String(inc.name).trim().toLowerCase() === nameTrimmed.toLowerCase();
+            });
+            if (isDuplicateName) {
+              newErrors.deviceName = "Tên thiết bị này đã tồn tại trên hệ thống";
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Lỗi kiểm tra trùng lặp thiết bị:", err);
+      }
     }
 
     // 4. Owner Validation
@@ -151,10 +152,11 @@ export default function AddDeviceModal({ isOpen, onClose, onSuccess }: AddDevice
 
     const selectedUser = users.find((u) => u.email === selectedUserEmail);
     const ownerUid = selectedUser ? selectedUser.uid : "";
+    const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     const newDeviceData = {
       name: deviceName.trim(),
-      code: pinCode.trim(),
+      code: generatedCode,
       ownerEmail: selectedUserEmail,
       ownerUid: ownerUid,
       status: "Offline",
@@ -192,13 +194,15 @@ export default function AddDeviceModal({ isOpen, onClose, onSuccess }: AddDevice
     };
 
     try {
-      const targetRef = ref(rtdb, `incubators/${deviceId.trim()}`);
+      const incubatorsRef = ref(rtdb, "incubators");
+      const targetRef = child(incubatorsRef, deviceId.trim());
       await set(targetRef, newDeviceData);
       setLoading(false);
       onSuccess();
     } catch (err: any) {
+      console.error("Lỗi khi thêm thiết bị:", err);
       setLoading(false);
-      setErrors({ global: err.message || "Đã xảy ra lỗi khi tạo thiết bị. Vui lòng thử lại." });
+      setErrors({ global: err?.message || "Đã xảy ra lỗi khi tạo thiết bị. Vui lòng thử lại." });
     }
   };
 
@@ -298,48 +302,7 @@ export default function AddDeviceModal({ isOpen, onClose, onSuccess }: AddDevice
             )}
           </div>
 
-          {/* PIN Code Input */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block pl-1">
-              Mã PIN Kích hoạt (6 số) <span className="text-rose-500">*</span>
-            </label>
-            <div className="flex gap-2">
-              <div className="relative flex-1 flex items-center">
-                <KeyRound className="absolute left-3.5 h-4 w-4 text-slate-400 z-10" />
-                <input
-                  type="text"
-                  maxLength={6}
-                  disabled={loading}
-                  value={pinCode}
-                  onChange={(e) => {
-                    // Only allow numbers
-                    const val = e.target.value.replace(/\D/g, "");
-                    setPinCode(val);
-                    if (errors.pinCode) setErrors((prev) => ({ ...prev, pinCode: "" }));
-                  }}
-                  placeholder="Ví dụ: 123456"
-                  className={`w-full pl-10 pr-4 py-3 bg-white border rounded-[16px] text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-4 focus:outline-none transition-all duration-200 ${errors.pinCode
-                    ? "border-rose-300 focus:border-rose-500 focus:ring-rose-100"
-                    : "border-slate-200 focus:border-amber-500 focus:ring-amber-100"
-                    }`}
-                />
-              </div>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={handleGeneratePin}
-                className="h-[46px] rounded-[16px] px-4 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold transition active:scale-95 duration-100 flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50"
-              >
-                Tạo ngẫu nhiên
-              </button>
-            </div>
-            {errors.pinCode && (
-              <p className="text-xs text-rose-600 font-semibold pl-1 flex items-center gap-1">
-                <span className="inline-block h-1 w-1 rounded-full bg-rose-500" />
-                {errors.pinCode}
-              </p>
-            )}
-          </div>
+
 
           {/* Owner Input */}
           <div className="space-y-1.5">
