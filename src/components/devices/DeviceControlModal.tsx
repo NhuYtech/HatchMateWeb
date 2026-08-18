@@ -88,46 +88,8 @@ export default function DeviceControlModal({
     return () => unsubscribe();
   }, [isOpen, deviceId]);
 
-  // Auto-control logic based on thresholds
-  useEffect(() => {
-    if (opMode !== "auto" || loading) return;
-
-    const tempMin = settings?.tempMin ?? 37.5;
-    const tempMax = settings?.tempMax ?? 38.1;
-    const humidityMax = settings?.humidityMax ?? 68;
-
-    let nextFan = fan;
-    let nextHeater1 = heater1;
-    let nextHeater2 = heater2;
-
-    // Fan logic (ON if hot or too humid)
-    if (temp > tempMax || humi > humidityMax) {
-      nextFan = true;
-    } else {
-      nextFan = false;
-    }
-
-    // Heaters logic (ON if cold, OFF if hot)
-    if (temp < tempMin) {
-      nextHeater1 = true;
-      nextHeater2 = true;
-    } else if (temp >= tempMax) {
-      nextHeater1 = false;
-      nextHeater2 = false;
-    }
-
-    // Write to Firebase if there is a change
-    if (nextFan !== fan || nextHeater1 !== heater1 || nextHeater2 !== heater2) {
-      const controlRef = ref(rtdb, `incubators/${deviceId}/control`);
-      set(controlRef, {
-        fan: nextFan,
-        heater1: nextHeater1,
-        heater2: nextHeater2,
-        turner: turner, // Keep turner state
-        reset: false
-      }).catch(err => console.error("Lỗi cập nhật tự động:", err));
-    }
-  }, [opMode, temp, humi, settings, fan, heater1, heater2, turner, deviceId, loading]);
+  // Ở Chế độ Tự động (Auto Mode), rơ-le phần cứng được điều khiển trực tiếp bởi ESP32 theo cảm biến.
+  // Web App và App Flutter không ghi đè lệnh điều khiển client-side lên node control.
 
   if (!isOpen) return null;
 

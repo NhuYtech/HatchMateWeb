@@ -338,6 +338,10 @@ function DeviceConfigurationContent() {
           ...(rawDbData?.telemetry || {}),
           day: currentDay,
           phase: phaseVal
+        },
+        command: {
+          ...(rawDbData?.command || {}),
+          setDay: currentDay
         }
       });
 
@@ -893,18 +897,6 @@ function DeviceConfigurationContent() {
                 <Clock className="h-4 w-4" />
                 Đồng bộ thời gian
               </button>
-
-              <div className="sm:ml-auto">
-                <button
-                  type="button"
-                  onClick={() => triggerMaintenance("factoryreset")}
-                  disabled={popupAlert?.type === "loading"}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full border-2 border-rose-200 hover:border-rose-300 bg-white hover:bg-rose-50 px-6 text-sm font-bold text-rose-600 shadow-sm transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  <AlertCircle className="h-4 w-4" />
-                  Khôi phục cài đặt gốc
-                </button>
-              </div>
             </div>
           </section>
 

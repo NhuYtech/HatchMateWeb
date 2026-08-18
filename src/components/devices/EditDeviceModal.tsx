@@ -56,6 +56,7 @@ export default function EditDeviceModal({ isOpen, onClose, onSuccess, device }: 
           // 2. Fetch device details from Firebase RTDB
           const incubatorsRef = ref(rtdb, "incubators");
           const snapshot = await get(incubatorsRef);
+          
           if (snapshot.exists()) {
             const allIncubators = snapshot.val();
             const data = allIncubators ? allIncubators[device.id] : null;
